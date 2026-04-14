@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#6366f1">
+  <title>ExpenseFlow — Receipt Manager</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+
+  <!-- SPLASH SCREEN -->
+  <div id="splash">
+    <div class="splash-logo">
+      <div class="splash-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+          <rect x="9" y="3" width="6" height="4" rx="1"/>
+          <path d="M9 12h6M9 16h4"/>
+        </svg>
+      </div>
+      <h1>ExpenseFlow</h1>
+      <p>Smart Receipt Management</p>
+    </div>
+  </div>
+
+  <!-- APP WRAPPER -->
+  <div id="app" class="hidden">
+
+    <!-- HEADER -->
+    <header id="app-header">
+      <div class="header-left">
+        <button class="btn-icon" id="menuBtn" aria-label="Menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div class="header-brand">
+          <span class="brand-dot"></span>
+          <span id="header-title">Dashboard</span>
+        </div>
+      </div>
+      <div class="header-right">
+        <button class="btn-icon" id="notifBtn" aria-label="Notifications">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+        </button>
+        <div class="avatar" id="userAvatar">JD</div>
+      </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main id="main-content">
+
+      <!-- PAGE: DASHBOARD -->
+      <section id="page-dashboard" class="page active">
+        <div class="page-scroll">
+
+          <div class="dashboard-greeting">
+            <div>
+              <p class="greeting-sub">Good morning,</p>
+              <h2 class="greeting-name" id="greetingName">User</h2>
+            </div>
+            <div class="greeting-month">
+              <span id="greetingMonth">April 2026</span>
+            </div>
+          </div>
+
+          <div class="spending-card">
+            <div class="spending-card-bg"></div>
+            <div class="spending-card-content">
+              <div class="spending-label">Monthly Spending</div>
+              <div class="spending-amount" id="dashMonthlyTotal">$0.00</div>
+              <div class="spending-meta">
+                <span id="dashReceiptCount">0 receipts</span>
+                <span class="spending-sep">·</span>
+                <span id="dashMonthName">this month</span>
+              </div>
+              <div class="spending-bar-wrap">
+                <div class="spending-bar" id="dashSpendingBar"></div>
+              </div>
+              <div class="spending-bar-labels">
+                <span>$0</span>
+                <span id="dashBudgetLabel">Budget</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="stats-row">
+            <div class="stat-card">
+              <div class="stat-icon stat-icon--purple">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
+              </div>
+              <div class="stat-info">
+                <div class="stat-value" id="dashPending">0</div>
+                <div class="stat-label">Pending</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon stat-icon--green">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <div class="stat-info">
+                <div class="stat-value" id="dashApproved">0</div>
+                <div class="stat-label">Approved</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon stat-icon--blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+              </div>
+              <div class="stat-info">
+                <div class="stat-value" id="dashTotal">$0</div>
+                <div class="stat-label">Total</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-header">
+            <h3>Categories</h3>
+            <button class="btn-text" onclick="navigate('receipts')">View all</button>
+          </div>
+          <div class="categories-list" id="dashCategories">
+            <div class="empty-state-small">No expenses yet</div>
+          </div>
+
+          <div class="section-header">
+            <h3>Recent Receipts</h3>
+            <button class="btn-text" onclick="navigate('receipts')">See all</button>
+          </div>
+          <div class="receipts-list" id="dashRecentReceipts">
+            <div class="empty-state">
+              <div class="empty-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
+              </div>
+              <p>No receipts yet</p>
+              <button class="btn-primary btn-sm" onclick="navigate('add')">Add your first receipt</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PAGE: ADD RECEIPT -->
+      <section id="page-add" class="page">
+        <div class="page-scroll">
+          <div class="add-steps">
+
+            <!-- Image Capture Step -->
+            <div class="capture-zone" id="captureZone">
+              <div class="capture-preview" id="capturePreview">
+                <div class="capture-placeholder" id="capturePlaceholder">
+                  <div class="capture-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  </div>
+                  <p class="capture-hint">Take a photo or upload your receipt</p>
+                </div>
+                <img id="capturedImg" class="hidden" alt="Captured receipt">
+                <video id="cameraStream" class="hidden" autoplay playsinline></video>
+              </div>
+              <div class="capture-actions">
+                <button class="btn-capture" id="btnCamera">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  Camera
+                </button>
+                <button class="btn-capture btn-capture--alt" id="btnUpload">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  Upload
+                </button>
+                <button class="btn-capture btn-capture--danger hidden" id="btnRemoveImg">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                  Remove
+                </button>
+              </div>
+              <input type="file" id="fileInput" accept="image/*" capture="environment" hidden>
+              <!-- Desktop camera controls -->
+              <div id="cameraControls" class="hidden">
+                <button class="btn-primary" id="btnCapture">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
+                  Capture
+                </button>
+                <button class="btn-ghost" id="btnCancelCamera">Cancel</button>
+              </div>
+            </div>
+
+            <!-- Receipt Form -->
+            <form id="receiptForm" class="receipt-form">
+              <div class="form-group form-group--amount">
+                <label>Amount</label>
+                <div class="amount-input-wrap">
+                  <select id="fCurrency" class="currency-select">
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="GBP">GBP</option>
+                    <option value="CAD">CAD</option>
+                    <option value="AUD">AUD</option>
+                    <option value="JPY">JPY</option>
+                    <option value="BRL">BRL</option>
+                    <option value="CHF">CHF</option>
+                  </select>
+                  <input type="number" id="fAmount" placeholder="0.00" step="0.01" min="0" required>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Category</label>
+                <div class="category-grid" id="categoryGrid">
+                  <button type="button" class="cat-chip" data-cat="meals">🍽️ Meals</button>
+                  <button type="button" class="cat-chip" data-cat="travel">✈️ Travel</button>
+                  <button type="button" class="cat-chip" data-cat="accommodation">🏨 Hotel</button>
+                  <button type="button" class="cat-chip" data-cat="software">🖥️ Software</button>
+                  <button type="button" class="cat-chip" data-cat="supplies">📦 Supplies</button>
+                  <button type="button" class="cat-chip" data-cat="entertainment">🎭 Events</button>
+                  <button type="button" class="cat-chip" data-cat="medical">🏥 Medical</button>
+                  <button type="button" class="cat-chip" data-cat="training">📚 Training</button>
+                  <button type="button" class="cat-chip" data-cat="other">💼 Other</button>
+                </div>
+                <input type="hidden" id="fCategory" required>
+              </div>
+
+              <div class="form-group">
+                <label for="fMerchant">Merchant / Vendor</label>
+                <input type="text" id="fMerchant" placeholder="e.g. Starbucks, Delta Airlines" required>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="fDate">Date</label>
+                  <input type="date" id="fDate" required>
+                </div>
+                <div class="form-group">
+                  <label for="fStatus">Status</label>
+                  <select id="fStatus">
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="fDesc">Description (optional)</label>
+                <textarea id="fDesc" rows="2" placeholder="Add notes about this expense..."></textarea>
+              </div>
+
+              <input type="hidden" id="fEditId">
+
+              <div class="form-actions">
+                <button type="button" class="btn-ghost" onclick="navigate('receipts')">Cancel</button>
+                <button type="submit" class="btn-primary" id="btnSave">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  Save Receipt
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- PAGE: RECEIPTS -->
+      <section id="page-receipts" class="page">
+        <div class="page-scroll">
+          <div class="search-bar-wrap">
+            <div class="search-bar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="search" id="searchInput" placeholder="Search receipts...">
+            </div>
+            <button class="btn-icon btn-filter" id="filterBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            </button>
+          </div>
+
+          <div class="filter-panel" id="filterPanel">
+            <div class="filter-row">
+              <label>Month</label>
+              <select id="filterMonth">
+                <option value="all">All months</option>
+              </select>
+            </div>
+            <div class="filter-row">
+              <label>Category</label>
+              <select id="filterCategory">
+                <option value="all">All categories</option>
+                <option value="meals">Meals</option>
+                <option value="travel">Travel</option>
+                <option value="accommodation">Hotel</option>
+                <option value="software">Software</option>
+                <option value="supplies">Supplies</option>
+                <option value="entertainment">Events</option>
+                <option value="medical">Medical</option>
+                <option value="training">Training</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="filter-row">
+              <label>Status</label>
+              <select id="filterStatus">
+                <option value="all">All statuses</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+            <button class="btn-ghost btn-sm" id="clearFilters">Clear filters</button>
+          </div>
+
+          <div class="receipts-count" id="receiptsCount">Loading...</div>
+          <div id="receiptsContainer" class="receipts-list">
+            <div class="empty-state">
+              <div class="empty-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
+              </div>
+              <p>No receipts found</p>
+            </div>
+          </div>
+        </div>
+        <button class="fab" onclick="navigate('add')" aria-label="Add receipt">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+      </section>
+
+      <!-- PAGE: REPORT -->
+      <section id="page-report" class="page">
+        <div class="page-scroll">
+          <div class="report-header">
+            <button class="btn-icon" id="reportPrevMonth">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <div class="report-month-display">
+              <h3 id="reportMonthLabel">April 2026</h3>
+              <p id="reportSubtitle">Monthly expense report</p>
+            </div>
+            <button class="btn-icon" id="reportNextMonth">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+
+          <div class="report-summary-cards">
+            <div class="summary-card summary-card--primary">
+              <div class="summary-label">Total Spent</div>
+              <div class="summary-value" id="reportTotal">$0.00</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-label">Receipts</div>
+              <div class="summary-value" id="reportCount">0</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-label">Avg / Day</div>
+              <div class="summary-value" id="reportAvgDay">$0</div>
+            </div>
+          </div>
+
+          <div class="section-header">
+            <h3>By Category</h3>
+          </div>
+          <div class="report-categories" id="reportCategories">
+            <div class="empty-state-small">No expenses this month</div>
+          </div>
+
+          <div class="section-header">
+            <h3>Receipts</h3>
+          </div>
+          <div id="reportReceiptsList" class="receipts-list">
+            <div class="empty-state-small">No receipts this month</div>
+          </div>
+
+          <div class="report-actions">
+            <button class="btn-primary" id="btnGeneratePDF">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+              Download PDF Report
+            </button>
+            <button class="btn-secondary" id="btnSendReport">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              Send to Management
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- PAGE: SETTINGS -->
+      <section id="page-settings" class="page">
+        <div class="page-scroll">
+          <div class="settings-section">
+            <h3 class="settings-section-title">Profile</h3>
+            <div class="settings-card">
+              <div class="settings-avatar-row">
+                <div class="settings-avatar" id="settingsAvatar">JD</div>
+                <div>
+                  <div class="settings-avatar-name" id="settingsAvatarName">John Doe</div>
+                  <div class="settings-avatar-email" id="settingsAvatarEmail">john@company.com</div>
+                </div>
+              </div>
+            </div>
+            <div class="settings-card">
+              <div class="form-group">
+                <label for="sName">Full Name</label>
+                <input type="text" id="sName" placeholder="Your name">
+              </div>
+              <div class="form-group">
+                <label for="sEmail">Your Email</label>
+                <input type="email" id="sEmail" placeholder="your@email.com">
+              </div>
+              <div class="form-group">
+                <label for="sEmployeeId">Employee ID</label>
+                <input type="text" id="sEmployeeId" placeholder="EMP-001">
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h3 class="settings-section-title">Company</h3>
+            <div class="settings-card">
+              <div class="form-group">
+                <label for="sCompany">Company Name</label>
+                <input type="text" id="sCompany" placeholder="ACME Corp">
+              </div>
+              <div class="form-group">
+                <label for="sDepartment">Department</label>
+                <input type="text" id="sDepartment" placeholder="Engineering, Sales...">
+              </div>
+              <div class="form-group">
+                <label for="sManagerEmail">Manager Email</label>
+                <input type="email" id="sManagerEmail" placeholder="manager@company.com">
+              </div>
+              <div class="form-group">
+                <label for="sMonthlyBudget">Monthly Budget</label>
+                <input type="number" id="sMonthlyBudget" placeholder="2000" step="100" min="0">
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h3 class="settings-section-title">Preferences</h3>
+            <div class="settings-card">
+              <div class="form-group">
+                <label for="sCurrency">Default Currency</label>
+                <select id="sCurrency">
+                  <option value="USD">USD — US Dollar</option>
+                  <option value="EUR">EUR — Euro</option>
+                  <option value="GBP">GBP — British Pound</option>
+                  <option value="CAD">CAD — Canadian Dollar</option>
+                  <option value="AUD">AUD — Australian Dollar</option>
+                  <option value="JPY">JPY — Japanese Yen</option>
+                  <option value="BRL">BRL — Brazilian Real</option>
+                  <option value="CHF">CHF — Swiss Franc</option>
+                </select>
+              </div>
+              <div class="settings-toggle-row">
+                <div>
+                  <div class="toggle-label">Dark Mode</div>
+                  <div class="toggle-sub">Switch to dark theme</div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="sDarkMode">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-actions">
+            <button class="btn-primary" id="btnSaveSettings">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              Save Settings
+            </button>
+          </div>
+
+          <div class="settings-section">
+            <h3 class="settings-section-title">Data</h3>
+            <div class="settings-card">
+              <button class="btn-danger-ghost" id="btnClearData">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+                Clear All Data
+              </button>
+            </div>
+          </div>
+
+          <div class="app-version">ExpenseFlow v1.0 · Built with ❤️</div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- BOTTOM NAVIGATION -->
+    <nav id="bottom-nav">
+      <button class="nav-item active" data-page="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        <span>Dashboard</span>
+      </button>
+      <button class="nav-item" data-page="receipts">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
+        <span>Receipts</span>
+      </button>
+      <button class="nav-item nav-item--add" data-page="add">
+        <div class="nav-add-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </div>
+        <span>Add</span>
+      </button>
+      <button class="nav-item" data-page="report">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <span>Report</span>
+      </button>
+      <button class="nav-item" data-page="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        <span>Settings</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- MODAL: RECEIPT DETAIL -->
+  <div class="modal-overlay hidden" id="receiptModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modalMerchant">Receipt</h3>
+        <button class="btn-icon" id="closeModal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body" id="modalBody">
+        <div class="modal-image-wrap">
+          <img id="modalImage" alt="Receipt" class="modal-image">
+          <div class="modal-no-image" id="modalNoImage">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <span>No image</span>
+          </div>
+        </div>
+        <div class="modal-details">
+          <div class="modal-amount" id="modalAmount">$0.00</div>
+          <div class="modal-meta">
+            <span class="badge" id="modalCategory">-</span>
+            <span class="badge badge--status" id="modalStatus">-</span>
+          </div>
+          <div class="modal-info-grid">
+            <div class="modal-info-item">
+              <span class="info-label">Date</span>
+              <span class="info-value" id="modalDate">-</span>
+            </div>
+            <div class="modal-info-item">
+              <span class="info-label">Currency</span>
+              <span class="info-value" id="modalCurrency">-</span>
+            </div>
+            <div class="modal-info-item modal-info-item--full">
+              <span class="info-label">Description</span>
+              <span class="info-value" id="modalDesc">-</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" id="modalEdit">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Edit
+        </button>
+        <button class="btn-danger" id="modalDelete">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIRM DELETE -->
+  <div class="modal-overlay hidden" id="confirmModal">
+    <div class="modal modal--sm">
+      <div class="modal-body modal-body--center">
+        <div class="confirm-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <h3>Delete Receipt?</h3>
+        <p>This action cannot be undone.</p>
+      </div>
+      <div class="modal-footer modal-footer--center">
+        <button class="btn-ghost" id="confirmCancel">Cancel</button>
+        <button class="btn-danger" id="confirmDelete">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div id="toastContainer"></div>
+
+  <!-- CANVAS (hidden, used for image capture) -->
+  <canvas id="captureCanvas" class="hidden"></canvas>
+
+  <script src="js/db.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
