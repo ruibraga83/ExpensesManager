@@ -25,13 +25,18 @@ const DB = (() => {
           rs.createIndex('status',    'status');
           rs.createIndex('createdAt', 'createdAt');
           rs.createIndex('userId',    'userId');
-        } else if (!tx.objectStore('receipts').indexNames.contains('userId')) {
-          /* upgrading from v1 — add userId index to existing store */
-          tx.objectStore('receipts').createIndex('userId', 'userId');
+        } else {
+          /* upgrading from v1 — add userId index if missing */
+          try {
+            const rs = tx.objectStore('receipts');
+            if (!rs.indexNames.contains('userId')) {
+              rs.createIndex('userId', 'userId');
+            }
+          } catch (ex) { console.warn('Could not upgrade receipts index:', ex); }
         }
 
-        /* ── users store (v2 addition) ── */
-        if (old < 2) {
+        /* ── users store — create if it doesn't exist yet ── */
+        if (!db.objectStoreNames.contains('users')) {
           const us = db.createObjectStore('users', { keyPath: 'id', autoIncrement: true });
           us.createIndex('email', 'email');
           us.createIndex('role',  'role');

@@ -85,7 +85,7 @@ async function init() {
     await DB.open();
     loadSettings();
     applyTheme();
-    State.allUsers = await DB.getAllUsers();
+    State.allUsers = await DB.getAllUsers().catch(() => []);
     hideSplash();
 
     /* check for saved session */
@@ -116,7 +116,7 @@ function hideSplash() {
    LOGIN / USER SESSION
    ════════════════════════════════ */
 async function showLoginScreen() {
-  State.allUsers = await DB.getAllUsers();
+  State.allUsers = await DB.getAllUsers().catch(() => State.allUsers);
   const screen = document.getElementById('loginScreen');
   screen.classList.remove('hidden');
   renderUserGrid();
