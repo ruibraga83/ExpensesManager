@@ -6,25 +6,88 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#6366f1">
-  <title>ExpenseFlow — Receipt Manager</title>
+  <title>ExpenseTracker - by lIqUiDuS</title>
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="icon.svg">
   <link rel="stylesheet" href="css/styles.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 
+  <!-- LOGIN / USER SELECT SCREEN -->
+  <div id="loginScreen" class="login-screen hidden">
+    <div class="login-bg"></div>
+    <div class="login-content">
+      <div class="login-brand">
+        <div class="login-icon">
+          <svg viewBox="0 0 100 100" fill="none">
+            <rect x="8" y="60" width="36" height="33" rx="3" fill="rgba(255,255,255,0.22)"/>
+            <path d="M8,60 L11,54.5 L14,60 L17,54.5 L20,60 L23,54.5 L26,60 L29,54.5 L32,60 L35,54.5 L38,60 L41,54.5 L44,54.5 L44,60 Z" fill="rgba(255,255,255,0.22)"/>
+            <rect x="13" y="66" width="24" height="2"   rx="1" fill="rgba(255,255,255,0.65)"/>
+            <rect x="13" y="71" width="16" height="1.8" rx="0.9" fill="rgba(255,255,255,0.45)"/>
+            <rect x="13" y="84" width="24" height="2"   rx="1" fill="rgba(255,255,255,0.65)"/>
+            <g transform="rotate(-40, 50, 50)" fill="white">
+              <path d="M88,50 C88,46.5 76,43.5 60,43.5 Q40,43 22,45 L22,55 Q40,57 60,56.5 C76,56.5 88,53.5 88,50 Z"/>
+              <path d="M54,43.5 C56,36 59,24 62,15 L71,43.5 Z"/>
+              <path d="M54,56.5 C56,64 59,76 62,85 L71,56.5 Z"/>
+              <ellipse cx="61" cy="27" rx="6" ry="2.2" opacity="0.9"/>
+              <ellipse cx="61" cy="73" rx="6" ry="2.2" opacity="0.9"/>
+              <path d="M27,45.5 C25,42 21,39 15,37 L23,45.5 Z" opacity="0.85"/>
+              <path d="M27,54.5 C25,58 21,61 15,63 L23,54.5 Z" opacity="0.85"/>
+            </g>
+            <circle cx="76" cy="16" r="2.2" fill="rgba(255,255,255,0.45)"/>
+          </svg>
+        </div>
+        <h1 class="login-app-name">ExpenseTracker</h1>
+        <p class="login-app-by">by lIqUiDuS</p>
+      </div>
+
+      <div class="login-card">
+        <p class="login-prompt">Select your profile</p>
+        <div class="users-grid" id="usersGrid">
+          <!-- populated by JS -->
+        </div>
+        <button class="btn-add-user-login" id="btnAddUserLogin">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Profile
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- SPLASH SCREEN -->
   <div id="splash">
     <div class="splash-logo">
       <div class="splash-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
-          <rect x="9" y="3" width="6" height="4" rx="1"/>
-          <path d="M9 12h6M9 16h4"/>
+        <!-- Aviation + Expense icon (white on transparent) -->
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Receipt document (lower-left) -->
+          <rect x="8" y="60" width="36" height="33" rx="3" fill="rgba(255,255,255,0.2)"/>
+          <path d="M8,60 L11,54.5 L14,60 L17,54.5 L20,60 L23,54.5 L26,60 L29,54.5 L32,60 L35,54.5 L38,60 L41,54.5 L44,54.5 L44,60 Z" fill="rgba(255,255,255,0.2)"/>
+          <rect x="13" y="66" width="24" height="2"   rx="1" fill="rgba(255,255,255,0.6)"/>
+          <rect x="13" y="71" width="16" height="1.8" rx="0.9" fill="rgba(255,255,255,0.4)"/>
+          <rect x="13" y="76" width="20" height="1.8" rx="0.9" fill="rgba(255,255,255,0.4)"/>
+          <line x1="13" y1="80.5" x2="39" y2="80.5" stroke="rgba(255,255,255,0.3)" stroke-width="0.8" stroke-dasharray="2.5,2"/>
+          <rect x="13" y="84" width="24" height="2"   rx="1" fill="rgba(255,255,255,0.6)"/>
+          <!-- Airplane top-down, -40° = pointing upper-right -->
+          <g transform="rotate(-40, 50, 50)" fill="white">
+            <path d="M88,50 C88,46.5 76,43.5 60,43.5 Q40,43 22,45 L22,55 Q40,57 60,56.5 C76,56.5 88,53.5 88,50 Z"/>
+            <path d="M54,43.5 C56,36 59,24 62,15 L71,43.5 Z"/>
+            <path d="M54,56.5 C56,64 59,76 62,85 L71,56.5 Z"/>
+            <ellipse cx="61" cy="27" rx="6" ry="2.2" opacity="0.9"/>
+            <ellipse cx="61" cy="73" rx="6" ry="2.2" opacity="0.9"/>
+            <path d="M27,45.5 C25,42 21,39 15,37 L23,45.5 Z" opacity="0.85"/>
+            <path d="M27,54.5 C25,58 21,61 15,63 L23,54.5 Z" opacity="0.85"/>
+          </g>
+          <!-- Contrail sparkle dots -->
+          <circle cx="76" cy="16" r="2.2" fill="rgba(255,255,255,0.45)"/>
+          <circle cx="83" cy="22" r="1.5" fill="rgba(255,255,255,0.3)"/>
+          <circle cx="88" cy="14" r="1"   fill="rgba(255,255,255,0.22)"/>
         </svg>
       </div>
-      <h1>ExpenseFlow</h1>
-      <p>Smart Receipt Management</p>
+      <h1>ExpenseTracker</h1>
+      <p>by lIqUiDuS</p>
     </div>
   </div>
 
@@ -43,10 +106,8 @@
         </div>
       </div>
       <div class="header-right">
-        <button class="btn-icon" id="notifBtn" aria-label="Notifications">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
-        </button>
-        <div class="avatar" id="userAvatar">JD</div>
+        <span class="role-badge hidden" id="roleBadge"></span>
+        <div class="avatar" id="userAvatar" title="Switch user" onclick="showLoginScreen()">JD</div>
       </div>
     </header>
 
@@ -223,6 +284,18 @@
                 <input type="text" id="fMerchant" placeholder="e.g. Starbucks, Delta Airlines" required>
               </div>
 
+              <div class="form-group">
+                <label for="fLocation">Airport / Location</label>
+                <div class="iata-input-wrap">
+                  <span class="iata-prefix">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 3L3 10.53v.98l6.84 2.65L12.48 21h.98L21 3z"/></svg>
+                  </span>
+                  <input type="text" id="fLocation" placeholder="IATA code or city, e.g. JFK · LHR · CDG · NYC HQ"
+                         maxlength="30" autocomplete="off" autocapitalize="characters" spellcheck="false">
+                  <span class="iata-tag" id="iataTag"></span>
+                </div>
+              </div>
+
               <div class="form-row">
                 <div class="form-group">
                   <label for="fDate">Date</label>
@@ -271,6 +344,12 @@
           </div>
 
           <div class="filter-panel" id="filterPanel">
+            <div class="filter-row" id="filterUserRow" style="display:none">
+              <label>User</label>
+              <select id="filterUser">
+                <option value="all">All users</option>
+              </select>
+            </div>
             <div class="filter-row">
               <label>Month</label>
               <select id="filterMonth">
@@ -322,6 +401,36 @@
       <!-- PAGE: REPORT -->
       <section id="page-report" class="page">
         <div class="page-scroll">
+          <!-- Admin/Finance tab bar (hidden for regular users) -->
+          <div class="report-tabs hidden" id="reportTabs">
+            <button class="report-tab active" data-tab="mine" id="tabMine">My Report</button>
+            <button class="report-tab" data-tab="team" id="tabTeam">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+              Team
+            </button>
+          </div>
+
+          <!-- Team overview panel (admin/finance only) -->
+          <div id="teamReportPanel" class="hidden">
+            <div class="team-user-filter">
+              <label class="team-filter-label">Viewing:</label>
+              <select id="teamUserSelect" class="team-user-select">
+                <option value="all">All Team Members</option>
+              </select>
+            </div>
+            <div class="team-summary-cards" id="teamSummaryCards"></div>
+            <div class="section-header"><h3>Team Members</h3></div>
+            <div id="teamMembersTable"></div>
+            <div class="report-actions">
+              <button class="btn-primary" id="btnTeamPDF">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                Team PDF Report
+              </button>
+            </div>
+          </div>
+
+          <!-- My report panel (default) -->
+          <div id="myReportPanel">
           <div class="report-header">
             <button class="btn-icon" id="reportPrevMonth">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
@@ -374,6 +483,7 @@
               Send to Management
             </button>
           </div>
+          </div><!-- /myReportPanel -->
         </div>
       </section>
 
@@ -465,6 +575,28 @@
             </button>
           </div>
 
+          <!-- Team / User Management (admin only) -->
+          <div class="settings-section" id="teamManagementSection" style="display:none">
+            <h3 class="settings-section-title">Team Members</h3>
+            <div class="settings-card">
+              <div id="usersList"></div>
+              <button class="btn-secondary btn-sm" id="btnAddTeamMember" style="width:100%;justify-content:center;margin-top:4px">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add Team Member
+              </button>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h3 class="settings-section-title">Session</h3>
+            <div class="settings-card">
+              <button class="btn-ghost" id="btnSwitchUser" style="width:100%;justify-content:center">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                Switch User
+              </button>
+            </div>
+          </div>
+
           <div class="settings-section">
             <h3 class="settings-section-title">Data</h3>
             <div class="settings-card">
@@ -475,7 +607,7 @@
             </div>
           </div>
 
-          <div class="app-version">ExpenseFlow v1.0 · Built with ❤️</div>
+          <div class="app-version">ExpenseTracker v1.0 · by lIqUiDuS</div>
         </div>
       </section>
 
@@ -541,6 +673,14 @@
               <span class="info-label">Currency</span>
               <span class="info-value" id="modalCurrency">-</span>
             </div>
+            <div class="modal-info-item">
+              <span class="info-label">Location</span>
+              <span class="info-value" id="modalLocation">-</span>
+            </div>
+            <div class="modal-info-item" id="modalUserRow">
+              <span class="info-label">Employee</span>
+              <span class="info-value" id="modalUser">-</span>
+            </div>
             <div class="modal-info-item modal-info-item--full">
               <span class="info-label">Description</span>
               <span class="info-value" id="modalDesc">-</span>
@@ -574,6 +714,54 @@
       <div class="modal-footer modal-footer--center">
         <button class="btn-ghost" id="confirmCancel">Cancel</button>
         <button class="btn-danger" id="confirmDelete">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: NEW / EDIT USER -->
+  <div class="modal-overlay hidden" id="userFormModal">
+    <div class="modal modal--sm">
+      <div class="modal-header">
+        <h3 id="userFormTitle">New Profile</h3>
+        <button class="btn-icon" id="closeUserModal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form id="userForm">
+          <div class="form-group">
+            <label for="ufName">Full Name *</label>
+            <input type="text" id="ufName" placeholder="Your name" required autocomplete="name">
+          </div>
+          <div class="form-group">
+            <label for="ufEmail">Email</label>
+            <input type="email" id="ufEmail" placeholder="your@company.com" autocomplete="email">
+          </div>
+          <div class="form-group">
+            <label for="ufEmployeeId">Employee ID</label>
+            <input type="text" id="ufEmployeeId" placeholder="EMP-001">
+          </div>
+          <div class="form-group">
+            <label for="ufDepartment">Department</label>
+            <input type="text" id="ufDepartment" placeholder="Engineering, Sales…">
+          </div>
+          <div class="form-group" id="ufRoleGroup">
+            <label for="ufRole">Role</label>
+            <select id="ufRole">
+              <option value="user">Employee</option>
+              <option value="finance">Finance Manager</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <input type="hidden" id="ufEditId">
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" id="cancelUserForm">Cancel</button>
+        <button class="btn-primary" id="confirmUserForm">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          Save
+        </button>
       </div>
     </div>
   </div>

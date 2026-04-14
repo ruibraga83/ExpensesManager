@@ -1,103 +1,110 @@
 /* ============================================
-   EXPENSEFLOW — Main Application
+   EXPENSETRACKER — Main Application  v2
    ============================================ */
-
 'use strict';
 
-/* ---- State ---- */
+/* ════════════════════════════════
+   STATE
+   ════════════════════════════════ */
 const State = {
-  receipts: [],
-  currentPage: 'dashboard',
+  receipts:     [],   // receipts visible to current user
+  allReceipts:  [],   // all receipts (for admin/finance)
+  allUsers:     [],   // all registered users
+  currentUser:  null, // { id, name, email, role, … }
+  currentPage:  'dashboard',
   capturedImage: null,
-  editingId: null,
+  editingId:     null,
   selectedCategory: null,
-  modalReceiptId: null,
-  filterOpen: false,
-  reportMonth: new Date().getMonth(),
-  reportYear: new Date().getFullYear(),
+  modalReceiptId:   null,
+  deleteTargetId:   null,
+  filterOpen:   false,
+  reportMonth:  new Date().getMonth(),
+  reportYear:   new Date().getFullYear(),
+  reportTab:    'mine', // 'mine' | 'team'
   cameraStream: null,
   settings: {
-    name: '',
-    email: '',
-    employeeId: '',
-    company: '',
-    department: '',
-    managerEmail: '',
-    currency: 'USD',
-    monthlyBudget: 2000,
-    darkMode: false
+    company: '', managerEmail: '', currency: 'USD',
+    monthlyBudget: 2000, darkMode: false
   }
 };
 
-/* ---- Category Config ---- */
+/* ════════════════════════════════
+   CONSTANTS
+   ════════════════════════════════ */
 const CATEGORIES = {
-  meals:         { label: 'Meals',          emoji: '🍽️', color: '#d97706' },
-  travel:        { label: 'Travel',         emoji: '✈️', color: '#2563eb' },
-  accommodation: { label: 'Hotel',          emoji: '🏨', color: '#7c3aed' },
-  software:      { label: 'Software',       emoji: '🖥️', color: '#16a34a' },
-  supplies:      { label: 'Supplies',       emoji: '📦', color: '#ea580c' },
-  entertainment: { label: 'Events',         emoji: '🎭', color: '#db2777' },
-  medical:       { label: 'Medical',        emoji: '🏥', color: '#dc2626' },
-  training:      { label: 'Training',       emoji: '📚', color: '#0284c7' },
-  other:         { label: 'Other',          emoji: '💼', color: '#64748b' }
+  meals:         { label: 'Meals',     emoji: '🍽️', color: '#d97706' },
+  travel:        { label: 'Travel',    emoji: '✈️', color: '#2563eb' },
+  accommodation: { label: 'Hotel',     emoji: '🏨', color: '#7c3aed' },
+  software:      { label: 'Software',  emoji: '🖥️', color: '#16a34a' },
+  supplies:      { label: 'Supplies',  emoji: '📦', color: '#ea580c' },
+  entertainment: { label: 'Events',    emoji: '🎭', color: '#db2777' },
+  medical:       { label: 'Medical',   emoji: '🏥', color: '#dc2626' },
+  training:      { label: 'Training',  emoji: '📚', color: '#0284c7' },
+  other:         { label: 'Other',     emoji: '💼', color: '#64748b' }
 };
 
-/* ---- Currency formatting ---- */
+const AVATAR_COLORS = [
+  '#6366f1','#8b5cf6','#ec4899','#14b8a6',
+  '#f59e0b','#ef4444','#10b981','#3b82f6',
+  '#a855f7','#06b6d4','#84cc16','#f97316'
+];
+
+/* ════════════════════════════════
+   HELPERS
+   ════════════════════════════════ */
 function formatCurrency(amount, currency = 'USD') {
-  try {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: 2 }).format(amount);
-  } catch {
-    return `${currency} ${Number(amount).toFixed(2)}`;
-  }
+  try { return new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: 2 }).format(amount); }
+  catch { return `${currency} ${Number(amount).toFixed(2)}`; }
 }
-
-function formatDate(dateStr) {
-  if (!dateStr) return '—';
-  try {
-    return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(dateStr + 'T00:00:00'));
-  } catch {
-    return dateStr;
-  }
+function formatDate(ds) {
+  if (!ds) return '—';
+  try { return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(ds + 'T00:00:00')); }
+  catch { return ds; }
 }
-
-function getMonthLabel(year, month) {
-  return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date(year, month));
+function getMonthLabel(y, m) {
+  return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date(y, m));
 }
-
-function todayISO() {
-  return new Date().toISOString().split('T')[0];
-}
-
+function todayISO() { return new Date().toISOString().split('T')[0]; }
 function initials(name) {
   if (!name) return 'ME';
-  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+  return name.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
 }
+function avatarColor(id) { return AVATAR_COLORS[(id - 1) % AVATAR_COLORS.length]; }
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function isAdmin()   { return State.currentUser?.role === 'admin'; }
+function isFinance() { return State.currentUser?.role === 'finance'; }
+function canSeeTeam(){ return isAdmin() || isFinance(); }
 
-/* ============================================
+/* ════════════════════════════════
    INITIALIZATION
-   ============================================ */
+   ════════════════════════════════ */
 async function init() {
   try {
     await DB.open();
     loadSettings();
     applyTheme();
-    State.receipts = await DB.getAll();
-    populateFilterMonths();
-    renderDashboard();
-    setupEventListeners();
-    setupNavigation();
-    populateSettingsForm();
+    State.allUsers = await DB.getAllUsers();
     hideSplash();
+
+    /* check for saved session */
+    const savedId = Number(localStorage.getItem('et_userId'));
+    if (savedId && State.allUsers.find(u => u.id === savedId)) {
+      await loginUser(savedId, true);
+    } else {
+      showLoginScreen();
+    }
   } catch (err) {
     console.error('Init error:', err);
     hideSplash();
-    showToast('Failed to initialize database', 'error');
+    showToast('Initialization failed', 'error');
   }
 }
 
 function hideSplash() {
   const splash = document.getElementById('splash');
-  const app = document.getElementById('app');
+  const app    = document.getElementById('app');
   setTimeout(() => {
     splash.classList.add('fade-out');
     app.classList.remove('hidden');
@@ -105,122 +112,185 @@ function hideSplash() {
   }, 800);
 }
 
-/* ============================================
-   SETTINGS
-   ============================================ */
-function loadSettings() {
-  try {
-    const saved = localStorage.getItem('ef_settings');
-    if (saved) Object.assign(State.settings, JSON.parse(saved));
-  } catch { /* ignore */ }
+/* ════════════════════════════════
+   LOGIN / USER SESSION
+   ════════════════════════════════ */
+async function showLoginScreen() {
+  State.allUsers = await DB.getAllUsers();
+  const screen = document.getElementById('loginScreen');
+  screen.classList.remove('hidden');
+  renderUserGrid();
 }
 
-function saveSettings() {
-  localStorage.setItem('ef_settings', JSON.stringify(State.settings));
+function hideLoginScreen() {
+  document.getElementById('loginScreen').classList.add('hidden');
 }
+
+function renderUserGrid() {
+  const grid = document.getElementById('usersGrid');
+  if (!State.allUsers.length) {
+    grid.innerHTML = '<p style="text-align:center;color:var(--text-3);font-size:.88rem;padding:8px 0">No profiles yet — add one below</p>';
+    return;
+  }
+  grid.innerHTML = State.allUsers.map(u => {
+    const color = avatarColor(u.id);
+    const roleLbl = u.role === 'admin' ? 'Admin' : u.role === 'finance' ? 'Finance Mgr' : 'Employee';
+    return `
+      <div class="user-login-card" onclick="loginUser(${u.id})">
+        <div class="user-login-avatar" style="background:${color}">${initials(u.name)}</div>
+        <div class="user-login-info">
+          <div class="user-login-name">${escapeHtml(u.name)}</div>
+          <div class="user-login-sub">${roleLbl}${u.department ? ' · ' + escapeHtml(u.department) : ''}</div>
+        </div>
+        <div class="user-login-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+      </div>`;
+  }).join('');
+}
+
+async function loginUser(userId, skipAnim = false) {
+  const user = await DB.getUserById(userId);
+  if (!user) { showLoginScreen(); return; }
+  State.currentUser = user;
+  localStorage.setItem('et_userId', userId);
+
+  /* load receipts based on role */
+  State.allReceipts = await DB.getAll();
+  State.receipts = canSeeTeam()
+    ? State.allReceipts
+    : State.allReceipts.filter(r => r.userId === userId);
+
+  populateFilterMonths();
+  populateFilterUsers();
+  setupNavigation();
+  setupEventListeners();
+  updateHeaderUser();
+  populateSettingsForm();
+  renderDashboard();
+  hideLoginScreen();
+
+  if (!skipAnim) showToast(`Welcome back, ${user.name.split(' ')[0]}!`, 'success');
+}
+
+function showLoginScreen_public() {
+  localStorage.removeItem('et_userId');
+  State.currentUser = null;
+  showLoginScreen();
+}
+window.showLoginScreen = showLoginScreen_public;
+
+function updateHeaderUser() {
+  const u = State.currentUser;
+  if (!u) return;
+  document.getElementById('userAvatar').textContent = initials(u.name);
+  const badge = document.getElementById('roleBadge');
+  if (u.role !== 'user') {
+    badge.textContent = u.role === 'admin' ? 'Admin' : 'Finance';
+    badge.className = `role-badge role-badge--${u.role}`;
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
+}
+
+/* ════════════════════════════════
+   SETTINGS
+   ════════════════════════════════ */
+function loadSettings() {
+  try { const s = localStorage.getItem('ef_settings'); if (s) Object.assign(State.settings, JSON.parse(s)); }
+  catch { /* ignore */ }
+}
+function saveSettings() { localStorage.setItem('ef_settings', JSON.stringify(State.settings)); }
 
 function populateSettingsForm() {
+  const u = State.currentUser || {};
   const s = State.settings;
-  document.getElementById('sName').value = s.name || '';
-  document.getElementById('sEmail').value = s.email || '';
-  document.getElementById('sEmployeeId').value = s.employeeId || '';
-  document.getElementById('sCompany').value = s.company || '';
-  document.getElementById('sDepartment').value = s.department || '';
+  document.getElementById('sName').value       = u.name       || '';
+  document.getElementById('sEmail').value      = u.email      || '';
+  document.getElementById('sEmployeeId').value = u.employeeId || '';
+  document.getElementById('sCompany').value    = u.company    || s.company || '';
+  document.getElementById('sDepartment').value = u.department || '';
   document.getElementById('sManagerEmail').value = s.managerEmail || '';
   document.getElementById('sMonthlyBudget').value = s.monthlyBudget || 2000;
-  document.getElementById('sCurrency').value = s.currency || 'USD';
-  document.getElementById('sDarkMode').checked = s.darkMode || false;
-  updateProfileDisplay();
+  document.getElementById('sCurrency').value   = s.currency || 'USD';
+  document.getElementById('sDarkMode').checked = s.darkMode  || false;
+
+  // Settings avatar
+  document.getElementById('settingsAvatar').textContent    = initials(u.name);
+  document.getElementById('settingsAvatarName').textContent = u.name  || 'Set your name';
+  document.getElementById('settingsAvatarEmail').textContent= u.email || 'Add your email';
+  if (u.id) {
+    document.getElementById('settingsAvatar').style.background =
+      `linear-gradient(135deg, ${avatarColor(u.id)}, ${avatarColor(u.id + 2)})`;
+  }
+
+  // Team management visibility (admin only)
+  document.getElementById('teamManagementSection').style.display = isAdmin() ? '' : 'none';
+  if (isAdmin()) renderUserManagementList();
 }
 
-function updateProfileDisplay() {
-  const s = State.settings;
-  const displayName = s.name || 'User';
-  document.getElementById('greetingName').textContent = displayName;
-  document.getElementById('userAvatar').textContent = initials(displayName);
-  document.getElementById('settingsAvatar').textContent = initials(displayName);
-  document.getElementById('settingsAvatarName').textContent = displayName || 'Set your name';
-  document.getElementById('settingsAvatarEmail').textContent = s.email || 'Add your email';
-  document.getElementById('fCurrency').value = s.currency || 'USD';
-}
+function applyTheme() { document.body.classList.toggle('dark', State.settings.darkMode); }
 
-function applyTheme() {
-  document.body.classList.toggle('dark', State.settings.darkMode);
-}
-
-/* ============================================
+/* ════════════════════════════════
    NAVIGATION
-   ============================================ */
-const PAGE_TITLES = {
-  dashboard: 'Dashboard',
-  add: 'Add Receipt',
-  receipts: 'Receipts',
-  report: 'Monthly Report',
-  settings: 'Settings'
-};
+   ════════════════════════════════ */
+const PAGE_TITLES = { dashboard:'Dashboard', add:'Add Receipt', receipts:'Receipts', report:'Monthly Report', settings:'Settings' };
 
-function navigate(page, skipAnimation = false) {
+function navigate(page) {
   const prev = document.getElementById(`page-${State.currentPage}`);
   const next = document.getElementById(`page-${page}`);
   if (!next || State.currentPage === page) return;
-
   prev.classList.remove('active');
-  next.classList.add('active');
-  if (!skipAnimation) next.classList.add('slide-in');
+  next.classList.add('active', 'slide-in');
   setTimeout(() => next.classList.remove('slide-in'), 300);
-
   State.currentPage = page;
   document.getElementById('header-title').textContent = PAGE_TITLES[page] || page;
-
-  document.querySelectorAll('.nav-item').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.page === page);
-  });
-
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.page === page));
   if (page === 'dashboard') renderDashboard();
-  if (page === 'receipts') renderReceiptsList();
-  if (page === 'report') renderReport();
+  if (page === 'receipts')  renderReceiptsList();
+  if (page === 'report')    renderReport();
   if (page === 'add' && !State.editingId) resetAddForm();
+  if (page === 'settings') populateSettingsForm();
 }
-
 window.navigate = navigate;
 
 function setupNavigation() {
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    // avoid duplicate listeners
+    btn.replaceWith(btn.cloneNode(true));
+  });
   document.querySelectorAll('.nav-item').forEach(btn => {
     btn.addEventListener('click', () => navigate(btn.dataset.page));
   });
 }
 
-/* ============================================
+/* ════════════════════════════════
    DASHBOARD
-   ============================================ */
+   ════════════════════════════════ */
 function renderDashboard() {
   const now = new Date();
-  const month = now.getMonth();
-  const year = now.getFullYear();
-
+  const month = now.getMonth(), year = now.getFullYear();
+  document.getElementById('greetingName').textContent = State.currentUser?.name?.split(' ')[0] || 'User';
   document.getElementById('greetingMonth').textContent = getMonthLabel(year, month);
 
   const monthReceipts = State.receipts.filter(r => {
     const d = new Date(r.date + 'T00:00:00');
     return d.getMonth() === month && d.getFullYear() === year;
   });
-
   const monthTotal = monthReceipts.reduce((s, r) => s + Number(r.amount), 0);
-  const allTotal = State.receipts.reduce((s, r) => s + Number(r.amount), 0);
-  const pending = State.receipts.filter(r => r.status === 'pending').length;
-  const approved = State.receipts.filter(r => r.status === 'approved').length;
+  const allTotal   = State.receipts.reduce((s, r) => s + Number(r.amount), 0);
+  const pending    = State.receipts.filter(r => r.status === 'pending').length;
+  const approved   = State.receipts.filter(r => r.status === 'approved').length;
+  const currency   = State.settings.currency;
 
-  document.getElementById('dashMonthlyTotal').textContent = formatCurrency(monthTotal, State.settings.currency);
+  document.getElementById('dashMonthlyTotal').textContent = formatCurrency(monthTotal, currency);
   document.getElementById('dashReceiptCount').textContent = `${monthReceipts.length} receipt${monthReceipts.length !== 1 ? 's' : ''}`;
-  document.getElementById('dashMonthName').textContent = 'this month';
-  document.getElementById('dashPending').textContent = pending;
+  document.getElementById('dashPending').textContent  = pending;
   document.getElementById('dashApproved').textContent = approved;
-  document.getElementById('dashTotal').textContent = formatCurrency(allTotal, State.settings.currency);
+  document.getElementById('dashTotal').textContent    = formatCurrency(allTotal, currency);
 
   const budget = State.settings.monthlyBudget || 2000;
-  const pct = Math.min((monthTotal / budget) * 100, 100);
-  document.getElementById('dashSpendingBar').style.width = pct + '%';
-  document.getElementById('dashBudgetLabel').textContent = formatCurrency(budget, State.settings.currency);
+  document.getElementById('dashSpendingBar').style.width = Math.min((monthTotal / budget) * 100, 100) + '%';
+  document.getElementById('dashBudgetLabel').textContent = formatCurrency(budget, currency);
 
   renderDashCategories(monthReceipts);
   renderRecentReceipts();
@@ -228,74 +298,69 @@ function renderDashboard() {
 
 function renderDashCategories(receipts) {
   const container = document.getElementById('dashCategories');
-  if (!receipts.length) {
-    container.innerHTML = '<div class="empty-state-small">No expenses this month</div>';
-    return;
-  }
-
+  if (!receipts.length) { container.innerHTML = '<div class="empty-state-small">No expenses this month</div>'; return; }
   const byCategory = {};
-  receipts.forEach(r => {
-    byCategory[r.category] = (byCategory[r.category] || 0) + Number(r.amount);
-  });
-
-  const max = Math.max(...Object.values(byCategory));
+  receipts.forEach(r => { byCategory[r.category] = (byCategory[r.category] || 0) + Number(r.amount); });
+  const max    = Math.max(...Object.values(byCategory));
   const sorted = Object.entries(byCategory).sort((a, b) => b[1] - a[1]);
-
+  const currency = State.settings.currency;
   container.innerHTML = sorted.map(([cat, total]) => {
     const info = CATEGORIES[cat] || CATEGORIES.other;
-    const pct = (total / max) * 100;
-    return `
-      <div class="cat-row">
-        <div class="cat-row-emoji">${info.emoji}</div>
-        <div class="cat-row-info">
-          <div class="cat-row-name">${info.label}</div>
-          <div class="cat-row-bar-wrap">
-            <div class="cat-row-bar" style="width:${pct}%"></div>
-          </div>
-        </div>
-        <div class="cat-row-amount">${formatCurrency(total, State.settings.currency)}</div>
-      </div>`;
+    return `<div class="cat-row">
+      <div class="cat-row-emoji">${info.emoji}</div>
+      <div class="cat-row-info">
+        <div class="cat-row-name">${info.label}</div>
+        <div class="cat-row-bar-wrap"><div class="cat-row-bar" style="width:${(total/max)*100}%"></div></div>
+      </div>
+      <div class="cat-row-amount">${formatCurrency(total, currency)}</div>
+    </div>`;
   }).join('');
 }
 
 function renderRecentReceipts() {
   const container = document.getElementById('dashRecentReceipts');
   const recent = State.receipts.slice(0, 5);
-
   if (!recent.length) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg></div>
-        <p>No receipts yet</p>
-        <button class="btn-primary btn-sm" onclick="navigate('add')">Add your first receipt</button>
-      </div>`;
+    container.innerHTML = `<div class="empty-state">
+      <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg></div>
+      <p>No receipts yet</p>
+      <button class="btn-primary btn-sm" onclick="navigate('add')">Add your first receipt</button>
+    </div>`;
     return;
   }
   container.innerHTML = recent.map(r => receiptCardHTML(r)).join('');
-  container.querySelectorAll('.receipt-card').forEach(card => {
-    card.addEventListener('click', () => openReceiptModal(Number(card.dataset.id)));
-  });
+  container.querySelectorAll('.receipt-card').forEach(card =>
+    card.addEventListener('click', () => openReceiptModal(Number(card.dataset.id)))
+  );
 }
 
-/* ============================================
+/* ════════════════════════════════
    RECEIPTS LIST
-   ============================================ */
+   ════════════════════════════════ */
 function renderReceiptsList() {
-  const search = document.getElementById('searchInput').value.toLowerCase();
-  const catFilter = document.getElementById('filterCategory').value;
+  const search      = (document.getElementById('searchInput').value || '').toLowerCase();
+  const catFilter   = document.getElementById('filterCategory').value;
   const monthFilter = document.getElementById('filterMonth').value;
-  const statusFilter = document.getElementById('filterStatus').value;
+  const statusFilter= document.getElementById('filterStatus').value;
+  const userFilter  = canSeeTeam() ? document.getElementById('filterUser').value : 'self';
 
   let filtered = State.receipts.filter(r => {
-    if (search && !r.merchant.toLowerCase().includes(search) &&
-        !(r.description || '').toLowerCase().includes(search) &&
-        !(CATEGORIES[r.category]?.label || '').toLowerCase().includes(search)) return false;
+    if (search) {
+      const catLabel = (CATEGORIES[r.category]?.label || '').toLowerCase();
+      const loc = (r.location || '').toLowerCase();
+      if (!r.merchant.toLowerCase().includes(search) &&
+          !(r.description || '').toLowerCase().includes(search) &&
+          !catLabel.includes(search) && !loc.includes(search)) return false;
+    }
     if (catFilter !== 'all' && r.category !== catFilter) return false;
     if (statusFilter !== 'all' && r.status !== statusFilter) return false;
     if (monthFilter !== 'all') {
       const [y, m] = monthFilter.split('-').map(Number);
       const d = new Date(r.date + 'T00:00:00');
       if (d.getFullYear() !== y || d.getMonth() !== m) return false;
+    }
+    if (userFilter !== 'all' && userFilter !== 'self') {
+      if (r.userId !== Number(userFilter)) return false;
     }
     return true;
   });
@@ -306,81 +371,97 @@ function renderReceiptsList() {
 
   const container = document.getElementById('receiptsContainer');
   if (!filtered.length) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg></div>
-        <p>No receipts found</p>
-      </div>`;
+    container.innerHTML = `<div class="empty-state">
+      <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg></div>
+      <p>No receipts found</p></div>`;
     return;
   }
-
   container.innerHTML = filtered.map(r => receiptCardHTML(r)).join('');
-  container.querySelectorAll('.receipt-card').forEach(card => {
-    card.addEventListener('click', () => openReceiptModal(Number(card.dataset.id)));
-  });
+  container.querySelectorAll('.receipt-card').forEach(card =>
+    card.addEventListener('click', () => openReceiptModal(Number(card.dataset.id)))
+  );
 }
 
 function receiptCardHTML(r) {
-  const cat = CATEGORIES[r.category] || CATEGORIES.other;
+  const cat  = CATEGORIES[r.category] || CATEGORIES.other;
   const thumb = r.imageData
     ? `<img src="${r.imageData}" alt="Receipt" loading="lazy">`
     : `<div class="receipt-thumb-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>`;
+  const locBadge = r.location
+    ? `<span class="badge badge--iata">✈ ${escapeHtml(r.location.toUpperCase())}</span>` : '';
+  /* show employee name on admin/finance view */
+  const userLabel = canSeeTeam() && r.userId
+    ? (() => { const u = State.allUsers.find(u => u.id === r.userId); return u ? `<span style="font-size:.7rem;color:var(--text-3)">${escapeHtml(u.name)}</span>` : ''; })() : '';
 
-  return `
-    <div class="receipt-card" data-id="${r.id}">
-      <div class="receipt-thumb">${thumb}</div>
-      <div class="receipt-info">
-        <div class="receipt-merchant">${escapeHtml(r.merchant)}</div>
-        <div class="receipt-meta">
-          <span class="badge badge--${r.category}">${cat.emoji} ${cat.label}</span>
-          <span class="badge badge--${r.status}">${r.status}</span>
-        </div>
-        <div class="receipt-date">${formatDate(r.date)}</div>
+  return `<div class="receipt-card" data-id="${r.id}">
+    <div class="receipt-thumb">${thumb}</div>
+    <div class="receipt-info">
+      <div class="receipt-merchant">${escapeHtml(r.merchant)}</div>
+      <div class="receipt-meta">
+        <span class="badge badge--${r.category}">${cat.emoji} ${cat.label}</span>
+        <span class="badge badge--${r.status}">${r.status}</span>
+        ${locBadge}
       </div>
-      <div class="receipt-right">
-        <div class="receipt-amount">${formatCurrency(r.amount, r.currency)}</div>
-        <div class="receipt-currency">${r.currency}</div>
-      </div>
-    </div>`;
+      <div class="receipt-date">${formatDate(r.date)} ${userLabel}</div>
+    </div>
+    <div class="receipt-right">
+      <div class="receipt-amount">${formatCurrency(r.amount, r.currency)}</div>
+      <div class="receipt-currency">${r.currency}</div>
+    </div>
+  </div>`;
 }
 
 function populateFilterMonths() {
   const select = document.getElementById('filterMonth');
-  const months = new Set();
+  const existing = new Set([...select.querySelectorAll('option')].map(o => o.value));
   State.receipts.forEach(r => {
     const d = new Date(r.date + 'T00:00:00');
-    months.add(`${d.getFullYear()}-${d.getMonth()}`);
-  });
-
-  const sorted = [...months].sort((a, b) => b.localeCompare(a));
-  sorted.forEach(key => {
-    const [y, m] = key.split('-').map(Number);
-    const opt = document.createElement('option');
-    opt.value = key;
-    opt.textContent = getMonthLabel(y, m);
-    select.appendChild(opt);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    if (!existing.has(key)) {
+      existing.add(key);
+      const [y, m] = key.split('-').map(Number);
+      const opt = document.createElement('option');
+      opt.value = key; opt.textContent = getMonthLabel(y, m);
+      select.appendChild(opt);
+    }
   });
 }
 
-/* ============================================
+function populateFilterUsers() {
+  const row    = document.getElementById('filterUserRow');
+  const select = document.getElementById('filterUser');
+  const teamSel= document.getElementById('teamUserSelect');
+  if (!canSeeTeam()) { row.style.display = 'none'; return; }
+  row.style.display = '';
+  // clear existing dynamic options
+  [...select.options].slice(1).forEach(o => o.remove());
+  [...(teamSel?.options || [])].slice(1).forEach(o => o.remove());
+  State.allUsers.forEach(u => {
+    const opt1 = document.createElement('option');
+    opt1.value = u.id; opt1.textContent = u.name;
+    select.appendChild(opt1);
+    if (teamSel) {
+      const opt2 = document.createElement('option');
+      opt2.value = u.id; opt2.textContent = u.name;
+      teamSel.appendChild(opt2);
+    }
+  });
+}
+
+/* ════════════════════════════════
    ADD / EDIT RECEIPT
-   ============================================ */
+   ════════════════════════════════ */
 function resetAddForm() {
-  State.capturedImage = null;
-  State.editingId = null;
-  State.selectedCategory = null;
-
+  State.capturedImage = null; State.editingId = null; State.selectedCategory = null;
   document.getElementById('receiptForm').reset();
-  document.getElementById('fDate').value = todayISO();
+  document.getElementById('fDate').value     = todayISO();
   document.getElementById('fCurrency').value = State.settings.currency || 'USD';
-  document.getElementById('fEditId').value = '';
-  document.getElementById('btnSave').innerHTML = `
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-    Save Receipt`;
-
+  document.getElementById('fEditId').value   = '';
+  document.getElementById('fLocation').value = '';
+  document.getElementById('iataTag').textContent = '';
+  document.getElementById('btnSave').innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Save Receipt`;
   document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('selected'));
   document.getElementById('fCategory').value = '';
-
   clearCaptureZone();
 }
 
@@ -393,152 +474,63 @@ function clearCaptureZone() {
 }
 
 function loadReceiptIntoForm(receipt) {
-  State.editingId = receipt.id;
-  State.selectedCategory = receipt.category;
+  State.editingId = receipt.id; State.selectedCategory = receipt.category;
   State.capturedImage = receipt.imageData || null;
-
-  document.getElementById('fAmount').value = receipt.amount;
+  document.getElementById('fAmount').value   = receipt.amount;
   document.getElementById('fCurrency').value = receipt.currency || 'USD';
   document.getElementById('fMerchant').value = receipt.merchant;
-  document.getElementById('fDate').value = receipt.date;
-  document.getElementById('fStatus').value = receipt.status;
-  document.getElementById('fDesc').value = receipt.description || '';
-  document.getElementById('fEditId').value = receipt.id;
-  document.getElementById('btnSave').innerHTML = `
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-    Update Receipt`;
-
-  document.querySelectorAll('.cat-chip').forEach(c => {
-    c.classList.toggle('selected', c.dataset.cat === receipt.category);
-  });
+  document.getElementById('fDate').value     = receipt.date;
+  document.getElementById('fStatus').value   = receipt.status;
+  document.getElementById('fDesc').value     = receipt.description || '';
+  document.getElementById('fLocation').value = receipt.location   || '';
+  document.getElementById('iataTag').textContent = receipt.location ? receipt.location.toUpperCase() : '';
+  document.getElementById('fEditId').value   = receipt.id;
+  document.getElementById('btnSave').innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Update Receipt`;
+  document.querySelectorAll('.cat-chip').forEach(c => c.classList.toggle('selected', c.dataset.cat === receipt.category));
   document.getElementById('fCategory').value = receipt.category;
-
   if (receipt.imageData) {
-    const img = document.getElementById('capturedImg');
-    img.src = receipt.imageData;
-    img.classList.remove('hidden');
+    document.getElementById('capturedImg').src = receipt.imageData;
+    document.getElementById('capturedImg').classList.remove('hidden');
     document.getElementById('capturePlaceholder').classList.add('hidden');
     document.getElementById('btnRemoveImg').classList.remove('hidden');
-  } else {
-    clearCaptureZone();
-  }
+  } else { clearCaptureZone(); }
 }
 
-/* ============================================
-   CAMERA
-   ============================================ */
-function isMobile() {
-  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-}
-
-function triggerCamera() {
-  if (isMobile()) {
-    document.getElementById('fileInput').setAttribute('capture', 'environment');
-    document.getElementById('fileInput').click();
-  } else {
-    startDesktopCamera();
-  }
-}
-
-async function startDesktopCamera() {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-    State.cameraStream = stream;
-    const video = document.getElementById('cameraStream');
-    video.srcObject = stream;
-    video.classList.remove('hidden');
-    document.getElementById('capturePlaceholder').classList.add('hidden');
-    document.getElementById('capturedImg').classList.add('hidden');
-    document.getElementById('cameraControls').classList.remove('hidden');
-    document.getElementById('capture-zone-btns') && (document.getElementById('capture-zone-btns').style.display = 'none');
-  } catch (err) {
-    if (err.name === 'NotAllowedError') {
-      showToast('Camera permission denied', 'error');
-    } else {
-      // Fallback to file input
-      document.getElementById('fileInput').removeAttribute('capture');
-      document.getElementById('fileInput').click();
-    }
-  }
-}
-
-function captureFromVideo() {
-  const video = document.getElementById('cameraStream');
-  const canvas = document.getElementById('captureCanvas');
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext('2d').drawImage(video, 0, 0);
-
-  const imageData = canvas.toDataURL('image/jpeg', 0.85);
-  setCapuredImage(imageData);
-  stopCameraStream();
-}
-
-function stopCameraStream() {
-  if (State.cameraStream) {
-    State.cameraStream.getTracks().forEach(t => t.stop());
-    State.cameraStream = null;
-  }
-  document.getElementById('cameraStream').classList.add('hidden');
-  document.getElementById('cameraStream').srcObject = null;
-  document.getElementById('cameraControls').classList.add('hidden');
-}
-
-function setCapuredImage(dataUrl) {
-  State.capturedImage = dataUrl;
-  const img = document.getElementById('capturedImg');
-  img.src = dataUrl;
-  img.classList.remove('hidden');
-  document.getElementById('capturePlaceholder').classList.add('hidden');
-  document.getElementById('btnRemoveImg').classList.remove('hidden');
-}
-
-function handleFileInput(file) {
-  if (!file || !file.type.startsWith('image/')) return;
-  const reader = new FileReader();
-  reader.onload = (e) => setCapuredImage(e.target.result);
-  reader.readAsDataURL(file);
-}
-
-/* ============================================
-   SAVE RECEIPT
-   ============================================ */
 async function saveReceipt(e) {
   e.preventDefault();
-
   const category = document.getElementById('fCategory').value;
-  if (!category) {
-    showToast('Please select a category', 'error');
-    return;
-  }
+  if (!category) { showToast('Please select a category', 'error'); return; }
 
   const receipt = {
-    amount: parseFloat(document.getElementById('fAmount').value),
-    currency: document.getElementById('fCurrency').value,
+    amount:      parseFloat(document.getElementById('fAmount').value),
+    currency:    document.getElementById('fCurrency').value,
     category,
-    merchant: document.getElementById('fMerchant').value.trim(),
-    date: document.getElementById('fDate').value,
-    status: document.getElementById('fStatus').value,
+    merchant:    document.getElementById('fMerchant').value.trim(),
+    date:        document.getElementById('fDate').value,
+    status:      document.getElementById('fStatus').value,
     description: document.getElementById('fDesc').value.trim(),
-    imageData: State.capturedImage || null
+    location:    document.getElementById('fLocation').value.trim().toUpperCase() || null,
+    imageData:   State.capturedImage || null,
+    userId:      State.currentUser?.id || null
   };
 
   const editId = document.getElementById('fEditId').value;
-
   try {
     if (editId) {
       receipt.id = Number(editId);
       await DB.update(receipt);
       const idx = State.receipts.findIndex(r => r.id === receipt.id);
       if (idx >= 0) State.receipts[idx] = receipt;
+      const aidx = State.allReceipts.findIndex(r => r.id === receipt.id);
+      if (aidx >= 0) State.allReceipts[aidx] = receipt;
       showToast('Receipt updated', 'success');
     } else {
       const id = await DB.add(receipt);
       receipt.id = id;
       State.receipts.unshift(receipt);
+      State.allReceipts.unshift(receipt);
       showToast('Receipt saved', 'success');
     }
-
     State.editingId = null;
     populateFilterMonths();
     navigate('receipts');
@@ -548,30 +540,96 @@ async function saveReceipt(e) {
   }
 }
 
-/* ============================================
-   RECEIPT MODAL
-   ============================================ */
-function openReceiptModal(id) {
-  const receipt = State.receipts.find(r => r.id === id);
-  if (!receipt) return;
+/* ════════════════════════════════
+   CAMERA
+   ════════════════════════════════ */
+function isMobile() { return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent); }
 
+function triggerCamera() {
+  if (isMobile()) {
+    document.getElementById('fileInput').setAttribute('capture', 'environment');
+    document.getElementById('fileInput').click();
+  } else { startDesktopCamera(); }
+}
+
+async function startDesktopCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    State.cameraStream = stream;
+    document.getElementById('cameraStream').srcObject = stream;
+    document.getElementById('cameraStream').classList.remove('hidden');
+    document.getElementById('capturePlaceholder').classList.add('hidden');
+    document.getElementById('capturedImg').classList.add('hidden');
+    document.getElementById('cameraControls').classList.remove('hidden');
+  } catch {
+    document.getElementById('fileInput').removeAttribute('capture');
+    document.getElementById('fileInput').click();
+  }
+}
+
+function captureFromVideo() {
+  const video  = document.getElementById('cameraStream');
+  const canvas = document.getElementById('captureCanvas');
+  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  setCapuredImage(canvas.toDataURL('image/jpeg', 0.85));
+  stopCameraStream();
+}
+
+function stopCameraStream() {
+  if (State.cameraStream) { State.cameraStream.getTracks().forEach(t => t.stop()); State.cameraStream = null; }
+  const vid = document.getElementById('cameraStream');
+  vid.classList.add('hidden'); vid.srcObject = null;
+  document.getElementById('cameraControls').classList.add('hidden');
+}
+
+function setCapuredImage(dataUrl) {
+  State.capturedImage = dataUrl;
+  const img = document.getElementById('capturedImg');
+  img.src = dataUrl; img.classList.remove('hidden');
+  document.getElementById('capturePlaceholder').classList.add('hidden');
+  document.getElementById('btnRemoveImg').classList.remove('hidden');
+}
+
+function handleFileInput(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = e => setCapuredImage(e.target.result);
+  reader.readAsDataURL(file);
+}
+
+/* ════════════════════════════════
+   RECEIPT MODAL
+   ════════════════════════════════ */
+function openReceiptModal(id) {
+  const receipt = State.receipts.find(r => r.id === id) || State.allReceipts.find(r => r.id === id);
+  if (!receipt) return;
   State.modalReceiptId = id;
   const cat = CATEGORIES[receipt.category] || CATEGORIES.other;
 
   document.getElementById('modalMerchant').textContent = receipt.merchant;
-  document.getElementById('modalAmount').textContent = formatCurrency(receipt.amount, receipt.currency);
+  document.getElementById('modalAmount').textContent   = formatCurrency(receipt.amount, receipt.currency);
 
   const catBadge = document.getElementById('modalCategory');
   catBadge.textContent = `${cat.emoji} ${cat.label}`;
-  catBadge.className = `badge badge--${receipt.category}`;
+  catBadge.className   = `badge badge--${receipt.category}`;
 
   const statusBadge = document.getElementById('modalStatus');
   statusBadge.textContent = receipt.status;
-  statusBadge.className = `badge badge--${receipt.status}`;
+  statusBadge.className   = `badge badge--${receipt.status}`;
 
-  document.getElementById('modalDate').textContent = formatDate(receipt.date);
+  document.getElementById('modalDate').textContent     = formatDate(receipt.date);
   document.getElementById('modalCurrency').textContent = receipt.currency;
-  document.getElementById('modalDesc').textContent = receipt.description || '—';
+  document.getElementById('modalLocation').textContent = receipt.location ? `✈ ${receipt.location.toUpperCase()}` : '—';
+  document.getElementById('modalDesc').textContent     = receipt.description || '—';
+
+  /* Show employee row for admin/finance */
+  const userRow = document.getElementById('modalUserRow');
+  if (canSeeTeam() && receipt.userId) {
+    const owner = State.allUsers.find(u => u.id === receipt.userId);
+    document.getElementById('modalUser').textContent = owner ? owner.name : '—';
+    userRow.style.display = '';
+  } else { userRow.style.display = 'none'; }
 
   if (receipt.imageData) {
     document.getElementById('modalImage').src = receipt.imageData;
@@ -581,6 +639,11 @@ function openReceiptModal(id) {
     document.getElementById('modalImage').classList.add('hidden');
     document.getElementById('modalNoImage').classList.remove('hidden');
   }
+
+  /* Admin/finance can only delete own receipts or any if admin */
+  const canEdit = isAdmin() || receipt.userId === State.currentUser?.id;
+  document.getElementById('modalEdit').style.display   = canEdit ? '' : 'none';
+  document.getElementById('modalDelete').style.display = canEdit ? '' : 'none';
 
   document.getElementById('receiptModal').classList.remove('hidden');
 }
@@ -599,25 +662,37 @@ function openConfirmDelete(id) {
 async function deleteReceipt(id) {
   try {
     await DB.remove(id);
-    State.receipts = State.receipts.filter(r => r.id !== id);
+    State.receipts    = State.receipts.filter(r => r.id !== id);
+    State.allReceipts = State.allReceipts.filter(r => r.id !== id);
     document.getElementById('confirmModal').classList.add('hidden');
     State.deleteTargetId = null;
     showToast('Receipt deleted', 'success');
     if (State.currentPage === 'receipts') renderReceiptsList();
     if (State.currentPage === 'dashboard') renderDashboard();
-  } catch (err) {
-    console.error('Delete error:', err);
-    showToast('Failed to delete', 'error');
+  } catch { showToast('Failed to delete', 'error'); }
+}
+
+/* ════════════════════════════════
+   REPORT — MY VIEW
+   ════════════════════════════════ */
+function renderReport() {
+  /* Show/hide team tab */
+  const tabs = document.getElementById('reportTabs');
+  tabs.classList.toggle('hidden', !canSeeTeam());
+
+  if (State.reportTab === 'team' && canSeeTeam()) {
+    document.getElementById('myReportPanel').style.display  = 'none';
+    document.getElementById('teamReportPanel').classList.remove('hidden');
+    renderTeamReport();
+  } else {
+    document.getElementById('myReportPanel').style.display  = '';
+    document.getElementById('teamReportPanel').classList.add('hidden');
+    renderMyReport();
   }
 }
 
-/* ============================================
-   REPORT
-   ============================================ */
-function renderReport() {
-  const month = State.reportMonth;
-  const year = State.reportYear;
-
+function renderMyReport() {
+  const month = State.reportMonth, year = State.reportYear;
   document.getElementById('reportMonthLabel').textContent = getMonthLabel(year, month);
 
   const receipts = State.receipts.filter(r => {
@@ -625,483 +700,650 @@ function renderReport() {
     return d.getMonth() === month && d.getFullYear() === year;
   });
 
-  const total = receipts.reduce((s, r) => s + Number(r.amount), 0);
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const avgDay = total / daysInMonth;
+  const total   = receipts.reduce((s, r) => s + Number(r.amount), 0);
+  const avgDay  = total / new Date(year, month + 1, 0).getDate();
+  const currency= State.settings.currency;
 
-  document.getElementById('reportTotal').textContent = formatCurrency(total, State.settings.currency);
-  document.getElementById('reportCount').textContent = receipts.length;
-  document.getElementById('reportAvgDay').textContent = formatCurrency(avgDay, State.settings.currency);
+  document.getElementById('reportTotal').textContent   = formatCurrency(total, currency);
+  document.getElementById('reportCount').textContent   = receipts.length;
+  document.getElementById('reportAvgDay').textContent  = formatCurrency(avgDay, currency);
 
-  renderReportCategories(receipts, total);
-  renderReportReceiptsList(receipts);
+  renderReportCategories(receipts, total, 'reportCategories');
+  renderReportReceiptsList(receipts, 'reportReceiptsList');
 }
 
-function renderReportCategories(receipts, grandTotal) {
-  const container = document.getElementById('reportCategories');
-  if (!receipts.length) {
-    container.innerHTML = '<div class="empty-state-small">No expenses this month</div>';
-    return;
-  }
+/* ════════════════════════════════
+   REPORT — TEAM VIEW
+   ════════════════════════════════ */
+function renderTeamReport() {
+  const month = State.reportMonth, year = State.reportYear;
+  const teamSel   = document.getElementById('teamUserSelect');
+  const filterUid = teamSel.value === 'all' ? null : Number(teamSel.value);
 
-  const byCategory = {};
-  receipts.forEach(r => {
-    byCategory[r.category] = (byCategory[r.category] || 0) + Number(r.amount);
+  const monthReceipts = State.allReceipts.filter(r => {
+    const d = new Date(r.date + 'T00:00:00');
+    return d.getMonth() === month && d.getFullYear() === year &&
+           (filterUid === null || r.userId === filterUid);
   });
 
-  const sorted = Object.entries(byCategory).sort((a, b) => b[1] - a[1]);
-  const max = sorted[0]?.[1] || 1;
-  const currency = State.settings.currency;
+  const teamTotal  = monthReceipts.reduce((s, r) => s + Number(r.amount), 0);
+  const currency   = State.settings.currency;
 
-  container.innerHTML = sorted.map(([cat, total]) => {
-    const info = CATEGORIES[cat] || CATEGORIES.other;
-    const pct = grandTotal > 0 ? (total / grandTotal * 100).toFixed(1) : 0;
-    const barW = (total / max) * 100;
-    const count = receipts.filter(r => r.category === cat).length;
+  /* Summary cards */
+  document.getElementById('teamSummaryCards').innerHTML = `
+    <div class="team-stat-card team-stat-card--primary">
+      <div>
+        <div class="stat-label">Team Total · ${getMonthLabel(year, month)}</div>
+        <div class="stat-value">${formatCurrency(teamTotal, currency)}</div>
+      </div>
+    </div>
+    <div class="team-stat-card">
+      <div class="stat-label">Receipts</div>
+      <div class="stat-value">${monthReceipts.length}</div>
+    </div>
+    <div class="team-stat-card">
+      <div class="stat-label">Members</div>
+      <div class="stat-value">${new Set(monthReceipts.map(r=>r.userId)).size}</div>
+    </div>`;
+
+  /* Per-user rows */
+  const memberTable = document.getElementById('teamMembersTable');
+  const usersToShow = filterUid
+    ? State.allUsers.filter(u => u.id === filterUid)
+    : State.allUsers;
+
+  if (!usersToShow.length) { memberTable.innerHTML = '<div class="empty-state-small">No team members</div>'; return; }
+
+  memberTable.innerHTML = usersToShow.map(u => {
+    const urecs  = monthReceipts.filter(r => r.userId === u.id);
+    const utotal = urecs.reduce((s, r) => s + Number(r.amount), 0);
+    const color  = avatarColor(u.id);
+    const roleLbl= u.role === 'admin' ? 'Admin' : u.role === 'finance' ? 'Finance' : 'Employee';
     return `
-      <div class="report-cat-row">
-        <div class="report-cat-emoji">${info.emoji}</div>
-        <div class="report-cat-info">
-          <div class="report-cat-name">${info.label}</div>
-          <div class="report-cat-count">${count} receipt${count !== 1 ? 's' : ''}</div>
-          <div class="report-cat-bar-wrap">
-            <div class="report-cat-bar" style="width:${barW}%"></div>
-          </div>
+      <div class="team-member-row">
+        <div class="team-member-avatar" style="background:${color}">${initials(u.name)}</div>
+        <div class="team-member-info">
+          <div class="team-member-name">${escapeHtml(u.name)}</div>
+          <div class="team-member-meta">${roleLbl}${u.department ? ' · '+escapeHtml(u.department):''}</div>
         </div>
-        <div>
-          <div class="report-cat-amount">${formatCurrency(total, currency)}</div>
-          <div class="report-cat-pct">${pct}%</div>
+        <div class="team-member-amount">
+          <div class="team-member-total">${formatCurrency(utotal, currency)}</div>
+          <div class="team-member-count">${urecs.length} receipt${urecs.length!==1?'s':''}</div>
         </div>
       </div>`;
   }).join('');
 }
 
-function renderReportReceiptsList(receipts) {
-  const container = document.getElementById('reportReceiptsList');
-  if (!receipts.length) {
-    container.innerHTML = '<div class="empty-state-small">No receipts this month</div>';
-    return;
-  }
-  container.innerHTML = receipts.map(r => receiptCardHTML(r)).join('');
-  container.querySelectorAll('.receipt-card').forEach(card => {
-    card.addEventListener('click', () => openReceiptModal(Number(card.dataset.id)));
-  });
+function renderReportCategories(receipts, grandTotal, containerId) {
+  const container = document.getElementById(containerId);
+  if (!receipts.length) { container.innerHTML = '<div class="empty-state-small">No expenses this month</div>'; return; }
+  const byCategory = {};
+  receipts.forEach(r => { byCategory[r.category] = (byCategory[r.category] || 0) + Number(r.amount); });
+  const sorted  = Object.entries(byCategory).sort((a, b) => b[1] - a[1]);
+  const max     = sorted[0]?.[1] || 1;
+  const currency= State.settings.currency;
+  container.innerHTML = sorted.map(([cat, total]) => {
+    const info  = CATEGORIES[cat] || CATEGORIES.other;
+    const pct   = grandTotal > 0 ? (total / grandTotal * 100).toFixed(1) : 0;
+    const count = receipts.filter(r => r.category === cat).length;
+    return `<div class="report-cat-row">
+      <div class="report-cat-emoji">${info.emoji}</div>
+      <div class="report-cat-info">
+        <div class="report-cat-name">${info.label}</div>
+        <div class="report-cat-count">${count} receipt${count!==1?'s':''}</div>
+        <div class="report-cat-bar-wrap"><div class="report-cat-bar" style="width:${(total/max)*100}%"></div></div>
+      </div>
+      <div>
+        <div class="report-cat-amount">${formatCurrency(total, currency)}</div>
+        <div class="report-cat-pct">${pct}%</div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
-/* ============================================
+function renderReportReceiptsList(receipts, containerId) {
+  const container = document.getElementById(containerId);
+  if (!receipts.length) { container.innerHTML = '<div class="empty-state-small">No receipts this month</div>'; return; }
+  container.innerHTML = receipts.map(r => receiptCardHTML(r)).join('');
+  container.querySelectorAll('.receipt-card').forEach(card =>
+    card.addEventListener('click', () => openReceiptModal(Number(card.dataset.id)))
+  );
+}
+
+/* ════════════════════════════════
    PDF GENERATION
-   ============================================ */
-async function generatePDF() {
+   ════════════════════════════════ */
+async function generatePDF(receiptsOverride, titleOverride) {
   const { jsPDF } = window.jspdf;
   if (!jsPDF) { showToast('PDF library not loaded', 'error'); return; }
 
-  const month = State.reportMonth;
-  const year = State.reportYear;
+  const month = State.reportMonth, year = State.reportYear;
   const monthLabel = getMonthLabel(year, month);
+  const u = State.currentUser || {};
   const s = State.settings;
   const currency = s.currency || 'USD';
 
-  const receipts = State.receipts.filter(r => {
+  const receipts = receiptsOverride || State.receipts.filter(r => {
     const d = new Date(r.date + 'T00:00:00');
     return d.getMonth() === month && d.getFullYear() === year;
   });
+  const reportTitle = titleOverride || `${u.name || 'Employee'} — ${monthLabel}`;
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageW = doc.internal.pageSize.getWidth();
 
-  // Header gradient band
-  doc.setFillColor(99, 102, 241);
-  doc.rect(0, 0, pageW, 40, 'F');
-  doc.setFillColor(139, 92, 246);
-  doc.rect(pageW - 60, 0, 60, 40, 'F');
+  /* Header band */
+  doc.setFillColor(99, 102, 241); doc.rect(0, 0, pageW, 40, 'F');
+  doc.setFillColor(124, 58, 237); doc.rect(pageW-55, 0, 55, 40, 'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold'); doc.setFontSize(20);
+  doc.text('ExpenseTracker', 14, 15);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  doc.text('by lIqUiDuS  ·  Aviation Expense Management', 14, 22);
+  doc.setFontSize(11); doc.text(reportTitle, 14, 33);
 
-  // Title
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(22);
-  doc.text('ExpenseFlow', 14, 16);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.text('Expense Report', 14, 24);
-  doc.setFontSize(11);
-  doc.text(monthLabel, 14, 33);
+  /* Right side meta */
+  doc.setFontSize(9);
+  doc.text(s.company || 'Company', pageW-14, 10, { align:'right' });
+  doc.text(`Generated: ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}`, pageW-14, 17, { align:'right' });
 
-  // Company / Employee info
-  doc.setTextColor(60, 60, 60);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.text(s.company || 'Company', pageW - 14, 10, { align: 'right' });
-  doc.setFont('helvetica', 'normal');
-  doc.text(s.name || 'Employee', pageW - 14, 17, { align: 'right' });
-  if (s.employeeId) doc.text(`ID: ${s.employeeId}`, pageW - 14, 23, { align: 'right' });
-  if (s.department) doc.text(s.department, pageW - 14, 29, { align: 'right' });
-  doc.text(`Generated: ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`, pageW - 14, 35, { align: 'right' });
-
-  // Summary boxes
-  const total = receipts.reduce((s, r) => s + Number(r.amount), 0);
-  const pending = receipts.filter(r => r.status === 'pending').length;
-  const approved = receipts.filter(r => r.status === 'approved').length;
-
-  const boxY = 48;
+  /* Summary boxes */
+  const total    = receipts.reduce((s, r) => s + Number(r.amount), 0);
+  const pending  = receipts.filter(r => r.status==='pending').length;
+  const approved = receipts.filter(r => r.status==='approved').length;
   const boxes = [
-    { label: 'Total Amount', value: formatCurrency(total, currency) },
-    { label: 'Receipts', value: String(receipts.length) },
-    { label: 'Pending', value: String(pending) },
-    { label: 'Approved', value: String(approved) }
+    { label:'Total Amount', value: formatCurrency(total, currency) },
+    { label:'Receipts', value: String(receipts.length) },
+    { label:'Pending',  value: String(pending) },
+    { label:'Approved', value: String(approved) }
   ];
-
-  const boxW = (pageW - 28 - 9) / 4;
+  const bY = 48, bW = (pageW-28-9)/4;
   boxes.forEach((box, i) => {
-    const x = 14 + i * (boxW + 3);
-    doc.setFillColor(248, 250, 252);
-    doc.roundedRect(x, boxY, boxW, 20, 2, 2, 'F');
-    doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(x, boxY, boxW, 20, 2, 2, 'S');
-
-    doc.setTextColor(100, 116, 139);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.text(box.label.toUpperCase(), x + boxW / 2, boxY + 7, { align: 'center' });
-
-    doc.setTextColor(30, 41, 59);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(i === 0 ? 9 : 11);
-    doc.text(box.value, x + boxW / 2, boxY + 15, { align: 'center' });
+    const x = 14 + i*(bW+3);
+    doc.setFillColor(248,250,252); doc.roundedRect(x, bY, bW, 20, 2, 2, 'F');
+    doc.setDrawColor(226,232,240); doc.roundedRect(x, bY, bW, 20, 2, 2, 'S');
+    doc.setTextColor(100,116,139); doc.setFont('helvetica','normal'); doc.setFontSize(7);
+    doc.text(box.label.toUpperCase(), x+bW/2, bY+7, { align:'center' });
+    doc.setTextColor(30,41,59); doc.setFont('helvetica','bold'); doc.setFontSize(i===0?9:11);
+    doc.text(box.value, x+bW/2, bY+15, { align:'center' });
   });
 
-  // Category breakdown
-  const catY = boxY + 28;
+  /* Category breakdown */
+  const catY = bY+28;
   const byCategory = {};
-  receipts.forEach(r => { byCategory[r.category] = (byCategory[r.category] || 0) + Number(r.amount); });
-  const catEntries = Object.entries(byCategory).sort((a, b) => b[1] - a[1]);
-
+  receipts.forEach(r => { byCategory[r.category]=(byCategory[r.category]||0)+Number(r.amount); });
+  const catEntries = Object.entries(byCategory).sort((a,b)=>b[1]-a[1]);
   if (catEntries.length) {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(30, 41, 59);
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(30,41,59);
     doc.text('By Category', 14, catY);
-
-    doc.setDrawColor(226, 232, 240);
-    doc.line(14, catY + 2, pageW - 14, catY + 2);
-
-    catEntries.forEach(([cat, amt], i) => {
-      const info = CATEGORIES[cat] || CATEGORIES.other;
-      const y = catY + 8 + i * 7;
-      const pct = total > 0 ? (amt / total * 100).toFixed(1) : 0;
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(51, 65, 85);
+    doc.setDrawColor(226,232,240); doc.line(14, catY+2, pageW-14, catY+2);
+    catEntries.forEach(([cat,amt],i)=>{
+      const info = CATEGORIES[cat]||CATEGORIES.other;
+      const y = catY+9+i*7;
+      const pct = total>0 ? (amt/total*100).toFixed(1) : 0;
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(51,65,85);
       doc.text(`${info.emoji} ${info.label}`, 14, y);
-      doc.setTextColor(100, 116, 139);
-      doc.text(`${pct}%`, 90, y, { align: 'right' });
-      doc.setTextColor(30, 41, 59);
-      doc.setFont('helvetica', 'bold');
-      doc.text(formatCurrency(amt, currency), pageW - 14, y, { align: 'right' });
-
-      // Mini bar
-      const barX = 95;
-      const barW2 = pageW - 14 - barX - 30;
-      const barFill = (amt / total) * barW2;
-      doc.setFillColor(226, 232, 240);
-      doc.roundedRect(barX, y - 3.5, barW2, 3, 1, 1, 'F');
-      doc.setFillColor(99, 102, 241);
-      doc.roundedRect(barX, y - 3.5, barFill, 3, 1, 1, 'F');
+      doc.setTextColor(100,116,139); doc.text(`${pct}%`, 88, y, {align:'right'});
+      doc.setTextColor(30,41,59); doc.setFont('helvetica','bold');
+      doc.text(formatCurrency(amt,currency), pageW-14, y, {align:'right'});
+      const bx=93, bw2=pageW-14-bx-30, bf=(amt/total)*bw2;
+      doc.setFillColor(226,232,240); doc.roundedRect(bx, y-3.5, bw2, 3, 1, 1, 'F');
+      doc.setFillColor(99,102,241);  doc.roundedRect(bx, y-3.5, bf,  3, 1, 1, 'F');
     });
   }
 
-  // Receipts table
-  const tableY = catY + 10 + catEntries.length * 7 + 10;
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.setTextColor(30, 41, 59);
-  doc.text('Receipts Detail', 14, tableY);
-
+  /* Receipts table */
+  const tY = catY+12+catEntries.length*7;
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(30,41,59);
+  doc.text('Receipts Detail', 14, tY);
   if (receipts.length) {
+    const cols = canSeeTeam() && !titleOverride?.includes('—')
+      ? ['Date','Employee','Merchant','Category','Location','Status','Amount']
+      : ['Date','Merchant','Category','Location','Status','Amount'];
+
     doc.autoTable({
-      startY: tableY + 4,
-      head: [['Date', 'Merchant', 'Category', 'Status', 'Amount']],
-      body: receipts.map(r => [
-        formatDate(r.date),
-        r.merchant,
-        (CATEGORIES[r.category] || CATEGORIES.other).label,
-        r.status.charAt(0).toUpperCase() + r.status.slice(1),
-        formatCurrency(r.amount, r.currency)
-      ]),
-      foot: [['', '', '', 'TOTAL', formatCurrency(total, currency)]],
-      styles: { fontSize: 9, cellPadding: 3 },
-      headStyles: { fillColor: [99, 102, 241], textColor: 255, fontStyle: 'bold' },
-      footStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
-      columnStyles: { 4: { halign: 'right', fontStyle: 'bold' } },
-      margin: { left: 14, right: 14 }
+      startY: tY+4,
+      head: [cols],
+      body: receipts.map(r => {
+        const base = [
+          formatDate(r.date), r.merchant,
+          (CATEGORIES[r.category]||CATEGORIES.other).label,
+          r.location || '—',
+          r.status.charAt(0).toUpperCase()+r.status.slice(1),
+          formatCurrency(r.amount, r.currency)
+        ];
+        if (canSeeTeam() && !titleOverride?.includes('—')) {
+          const owner = State.allUsers.find(u=>u.id===r.userId);
+          base.splice(1, 0, owner?.name || '—');
+        }
+        return base;
+      }),
+      foot: [[...Array(cols.length-2).fill(''), 'TOTAL', formatCurrency(total,currency)]],
+      styles: { fontSize:8.5, cellPadding:2.8 },
+      headStyles: { fillColor:[99,102,241], textColor:255, fontStyle:'bold' },
+      footStyles: { fillColor:[241,245,249], textColor:[30,41,59], fontStyle:'bold' },
+      alternateRowStyles: { fillColor:[248,250,252] },
+      columnStyles: { [cols.length-1]: { halign:'right', fontStyle:'bold' } },
+      margin: { left:14, right:14 }
     });
-  } else {
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(9);
-    doc.setTextColor(148, 163, 184);
-    doc.text('No receipts this month', 14, tableY + 12);
   }
 
-  // Footer
-  const pageCount = doc.internal.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
+  /* Footer */
+  const pages = doc.internal.getNumberOfPages();
+  for (let i=1; i<=pages; i++) {
     doc.setPage(i);
-    const footY = doc.internal.pageSize.getHeight() - 8;
-    doc.setFontSize(7.5);
-    doc.setTextColor(148, 163, 184);
-    doc.setFont('helvetica', 'normal');
-    doc.text('ExpenseFlow — Confidential', 14, footY);
-    doc.text(`Page ${i} of ${pageCount}`, pageW - 14, footY, { align: 'right' });
-    if (s.company) doc.text(s.company, pageW / 2, footY, { align: 'center' });
+    const fY = doc.internal.pageSize.getHeight()-8;
+    doc.setFontSize(7.5); doc.setTextColor(148,163,184); doc.setFont('helvetica','normal');
+    doc.text('ExpenseTracker — Confidential · by lIqUiDuS', 14, fY);
+    doc.text(`Page ${i} of ${pages}`, pageW-14, fY, {align:'right'});
+    if (s.company) doc.text(s.company, pageW/2, fY, {align:'center'});
   }
 
-  const filename = `ExpenseReport_${year}_${String(month + 1).padStart(2, '0')}_${(s.name || 'report').replace(/\s+/g, '_')}.pdf`;
-  doc.save(filename);
+  const name  = (u.name||'report').replace(/\s+/g,'_');
+  const fname = `ExpenseReport_${year}_${String(month+1).padStart(2,'0')}_${name}.pdf`;
+  doc.save(fname);
   showToast('PDF downloaded!', 'success');
+}
+
+async function generateTeamPDF() {
+  const month = State.reportMonth, year = State.reportYear;
+  const teamSel   = document.getElementById('teamUserSelect');
+  const filterUid = teamSel.value === 'all' ? null : Number(teamSel.value);
+  const receipts  = State.allReceipts.filter(r => {
+    const d = new Date(r.date + 'T00:00:00');
+    return d.getMonth() === month && d.getFullYear() === year &&
+           (filterUid === null || r.userId === filterUid);
+  });
+  const titleSuffix = filterUid
+    ? State.allUsers.find(u=>u.id===filterUid)?.name || 'User'
+    : 'All Team';
+  await generatePDF(receipts, `${titleSuffix} · ${getMonthLabel(year, month)}`);
 }
 
 function sendReportEmail() {
   const s = State.settings;
-  if (!s.managerEmail) {
-    showToast('Add manager email in Settings first', 'info');
-    navigate('settings');
-    return;
-  }
-
-  const month = State.reportMonth;
-  const year = State.reportYear;
+  if (!s.managerEmail) { showToast('Add manager email in Settings first', 'info'); navigate('settings'); return; }
+  const month = State.reportMonth, year = State.reportYear;
   const monthLabel = getMonthLabel(year, month);
   const receipts = State.receipts.filter(r => {
     const d = new Date(r.date + 'T00:00:00');
     return d.getMonth() === month && d.getFullYear() === year;
   });
-  const total = receipts.reduce((sum, r) => sum + Number(r.amount), 0);
-
-  const subject = encodeURIComponent(`Expense Report — ${monthLabel} — ${s.name || 'Employee'}`);
+  const total = receipts.reduce((sum,r) => sum+Number(r.amount), 0);
+  const u = State.currentUser || {};
+  const subject = encodeURIComponent(`Expense Report — ${monthLabel} — ${u.name||'Employee'}`);
   const body = encodeURIComponent(
     `Hi,\n\nPlease find my expense report for ${monthLabel}.\n\n` +
-    `Employee: ${s.name || '—'}\n` +
-    `Department: ${s.department || '—'}\n` +
-    `Period: ${monthLabel}\n` +
-    `Total Amount: ${formatCurrency(total, s.currency)}\n` +
-    `Number of Receipts: ${receipts.length}\n\n` +
-    `Please download the PDF report from ExpenseFlow for the complete breakdown.\n\n` +
-    `Best regards,\n${s.name || 'Employee'}`
+    `Employee: ${u.name||'—'}\nDepartment: ${u.department||'—'}\nEmployee ID: ${u.employeeId||'—'}\n` +
+    `Period: ${monthLabel}\nTotal Amount: ${formatCurrency(total, s.currency)}\nReceipts: ${receipts.length}\n\n` +
+    `Please download the PDF report from ExpenseTracker for the complete breakdown.\n\nBest regards,\n${u.name||'Employee'}`
   );
-
   window.location.href = `mailto:${s.managerEmail}?subject=${subject}&body=${body}`;
   showToast('Opening email client...', 'info');
 }
 
-/* ============================================
-   TOAST NOTIFICATIONS
-   ============================================ */
+/* ════════════════════════════════
+   USER MANAGEMENT
+   ════════════════════════════════ */
+function renderUserManagementList() {
+  const container = document.getElementById('usersList');
+  if (!State.allUsers.length) { container.innerHTML = '<p style="color:var(--text-3);font-size:.85rem">No users yet</p>'; return; }
+  container.innerHTML = State.allUsers.map(u => {
+    const color  = avatarColor(u.id);
+    const roleLbl= u.role==='admin'?'Admin':u.role==='finance'?'Finance Mgr':'Employee';
+    const isSelf = u.id === State.currentUser?.id;
+    return `<div class="user-row">
+      <div class="user-row-avatar" style="background:${color}">${initials(u.name)}</div>
+      <div class="user-row-info">
+        <div class="user-row-name">${escapeHtml(u.name)} ${isSelf?'<span style="font-size:.7rem;color:var(--primary)">(you)</span>':''}</div>
+        <div class="user-row-email">${roleLbl}${u.email?' · '+escapeHtml(u.email):''}</div>
+      </div>
+      <div class="user-row-actions">
+        <button class="btn-icon-sm" onclick="openUserForm(${u.id})" title="Edit">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        ${!isSelf ? `<button class="btn-icon-sm btn-icon-sm--danger" onclick="confirmDeleteUser(${u.id})" title="Remove">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+        </button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+window.openUserForm     = openUserForm;
+window.confirmDeleteUser= confirmDeleteUser;
+
+function openUserForm(userId = null) {
+  document.getElementById('userFormTitle').textContent = userId ? 'Edit Profile' : 'New Profile';
+  document.getElementById('ufEditId').value = userId || '';
+  document.getElementById('userForm').reset();
+  /* Only admin sees the role field */
+  document.getElementById('ufRoleGroup').style.display = isAdmin() ? '' : 'none';
+
+  if (userId) {
+    const u = State.allUsers.find(u => u.id === userId);
+    if (u) {
+      document.getElementById('ufName').value       = u.name       || '';
+      document.getElementById('ufEmail').value      = u.email      || '';
+      document.getElementById('ufEmployeeId').value = u.employeeId || '';
+      document.getElementById('ufDepartment').value = u.department || '';
+      document.getElementById('ufRole').value       = u.role       || 'user';
+    }
+  } else {
+    /* First user is always admin */
+    if (!State.allUsers.length) {
+      document.getElementById('ufRole').value = 'admin';
+      document.getElementById('ufRoleGroup').style.display = 'none';
+    }
+  }
+  document.getElementById('userFormModal').classList.remove('hidden');
+}
+
+async function saveUserForm() {
+  const nameEl = document.getElementById('ufName');
+  if (!nameEl.value.trim()) { showToast('Name is required', 'error'); return; }
+  const editId = document.getElementById('ufEditId').value;
+  const userData = {
+    name:       document.getElementById('ufName').value.trim(),
+    email:      document.getElementById('ufEmail').value.trim(),
+    employeeId: document.getElementById('ufEmployeeId').value.trim(),
+    department: document.getElementById('ufDepartment').value.trim(),
+    role:       document.getElementById('ufRole').value || 'user'
+  };
+  /* First user always gets admin */
+  if (!State.allUsers.length && !editId) userData.role = 'admin';
+
+  try {
+    if (editId) {
+      userData.id = Number(editId);
+      await DB.updateUser(userData);
+      const idx = State.allUsers.findIndex(u => u.id === userData.id);
+      if (idx >= 0) State.allUsers[idx] = userData;
+      /* Update currentUser if self */
+      if (State.currentUser?.id === userData.id) {
+        State.currentUser = userData;
+        updateHeaderUser();
+        populateSettingsForm();
+      }
+      showToast('Profile updated', 'success');
+    } else {
+      const id = await DB.addUser(userData);
+      userData.id = id;
+      State.allUsers.push(userData);
+      showToast('Profile created', 'success');
+    }
+    document.getElementById('userFormModal').classList.add('hidden');
+    renderUserManagementList();
+    populateFilterUsers();
+  } catch (err) {
+    console.error(err);
+    showToast('Failed to save profile', 'error');
+  }
+}
+
+async function confirmDeleteUser(userId) {
+  if (!confirm('Remove this user? Their receipts will remain in the system.')) return;
+  try {
+    await DB.removeUser(userId);
+    State.allUsers = State.allUsers.filter(u => u.id !== userId);
+    renderUserManagementList();
+    populateFilterUsers();
+    showToast('User removed', 'success');
+  } catch { showToast('Failed to remove user', 'error'); }
+}
+
+/* ════════════════════════════════
+   TOAST
+   ════════════════════════════════ */
 function showToast(message, type = 'info') {
   const container = document.getElementById('toastContainer');
   const toast = document.createElement('div');
   toast.className = `toast toast--${type}`;
   toast.textContent = message;
   container.appendChild(toast);
-
   setTimeout(() => {
     toast.classList.add('toast--out');
     setTimeout(() => toast.remove(), 350);
   }, 2800);
 }
 
-/* ============================================
-   UTILITIES
-   ============================================ */
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-/* ============================================
+/* ════════════════════════════════
    EVENT LISTENERS
-   ============================================ */
+   ════════════════════════════════ */
 function setupEventListeners() {
-  // Camera / Upload
-  document.getElementById('btnCamera').addEventListener('click', triggerCamera);
-  document.getElementById('btnUpload').addEventListener('click', () => {
+  /* avoid duplicate listeners by cloning key elements */
+  const clone = id => { const el=document.getElementById(id); const c=el.cloneNode(true); el.replaceWith(c); return c; };
+
+  /* Camera / upload */
+  clone('btnCamera').addEventListener('click', triggerCamera);
+  clone('btnUpload').addEventListener('click', () => {
     document.getElementById('fileInput').removeAttribute('capture');
     document.getElementById('fileInput').click();
   });
-  document.getElementById('fileInput').addEventListener('change', (e) => {
-    handleFileInput(e.target.files[0]);
-    e.target.value = '';
-  });
-  document.getElementById('btnCapture').addEventListener('click', captureFromVideo);
-  document.getElementById('btnCancelCamera').addEventListener('click', () => {
+  document.getElementById('fileInput').addEventListener('change', e => { handleFileInput(e.target.files[0]); e.target.value=''; });
+  clone('btnCapture').addEventListener('click', captureFromVideo);
+  clone('btnCancelCamera').addEventListener('click', () => {
     stopCameraStream();
     document.getElementById('capturePlaceholder').classList.remove('hidden');
   });
-  document.getElementById('btnRemoveImg').addEventListener('click', () => {
-    State.capturedImage = null;
-    clearCaptureZone();
+  clone('btnRemoveImg').addEventListener('click', () => { State.capturedImage=null; clearCaptureZone(); });
+
+  /* IATA field — auto uppercase + tag preview */
+  document.getElementById('fLocation').addEventListener('input', e => {
+    const val = e.target.value.toUpperCase();
+    e.target.value = val;
+    const tag = document.getElementById('iataTag');
+    tag.textContent = val.length >= 2 ? val : '';
   });
 
-  // Category chips
-  document.getElementById('categoryGrid').addEventListener('click', (e) => {
+  /* Category chips */
+  document.getElementById('categoryGrid').addEventListener('click', e => {
     const chip = e.target.closest('.cat-chip');
     if (!chip) return;
     document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('selected'));
     chip.classList.add('selected');
-    State.selectedCategory = chip.dataset.cat;
     document.getElementById('fCategory').value = chip.dataset.cat;
   });
 
-  // Receipt form
-  document.getElementById('receiptForm').addEventListener('submit', saveReceipt);
+  /* Receipt form */
+  clone('receiptForm').addEventListener('submit', saveReceipt);
 
-  // Search & filter
+  /* Search & filter */
   document.getElementById('searchInput').addEventListener('input', () => renderReceiptsList());
-  document.getElementById('filterBtn').addEventListener('click', () => {
+  clone('filterBtn').addEventListener('click', () => {
     State.filterOpen = !State.filterOpen;
     document.getElementById('filterPanel').classList.toggle('open', State.filterOpen);
     document.getElementById('filterBtn').classList.toggle('active', State.filterOpen);
   });
-  document.getElementById('filterCategory').addEventListener('change', () => renderReceiptsList());
-  document.getElementById('filterMonth').addEventListener('change', () => renderReceiptsList());
-  document.getElementById('filterStatus').addEventListener('change', () => renderReceiptsList());
+  ['filterCategory','filterMonth','filterStatus','filterUser'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', () => renderReceiptsList());
+  });
   document.getElementById('clearFilters').addEventListener('click', () => {
-    document.getElementById('filterCategory').value = 'all';
-    document.getElementById('filterMonth').value = 'all';
-    document.getElementById('filterStatus').value = 'all';
+    ['filterCategory','filterMonth','filterStatus','filterUser'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = 'all';
+    });
     renderReceiptsList();
   });
 
-  // Receipt modal
-  document.getElementById('closeModal').addEventListener('click', closeReceiptModal);
-  document.getElementById('receiptModal').addEventListener('click', (e) => {
+  /* Receipt modal */
+  clone('closeModal').addEventListener('click', closeReceiptModal);
+  document.getElementById('receiptModal').addEventListener('click', e => {
     if (e.target === document.getElementById('receiptModal')) closeReceiptModal();
   });
-  document.getElementById('modalDelete').addEventListener('click', () => {
-    if (State.modalReceiptId) openConfirmDelete(State.modalReceiptId);
-  });
-  document.getElementById('modalEdit').addEventListener('click', async () => {
+  clone('modalDelete').addEventListener('click', () => { if (State.modalReceiptId) openConfirmDelete(State.modalReceiptId); });
+  clone('modalEdit').addEventListener('click', async () => {
     const id = State.modalReceiptId;
     closeReceiptModal();
     const receipt = await DB.getById(id);
-    if (receipt) {
-      navigate('add');
-      loadReceiptIntoForm(receipt);
-    }
+    if (receipt) { navigate('add'); loadReceiptIntoForm(receipt); }
   });
 
-  // Confirm delete modal
-  document.getElementById('confirmCancel').addEventListener('click', () => {
-    document.getElementById('confirmModal').classList.add('hidden');
-    State.deleteTargetId = null;
-  });
-  document.getElementById('confirmDelete').addEventListener('click', () => {
-    if (State.deleteTargetId) deleteReceipt(State.deleteTargetId);
-  });
-  document.getElementById('confirmModal').addEventListener('click', (e) => {
-    if (e.target === document.getElementById('confirmModal')) {
-      document.getElementById('confirmModal').classList.add('hidden');
-      State.deleteTargetId = null;
-    }
+  /* Confirm delete modal */
+  clone('confirmCancel').addEventListener('click', () => { document.getElementById('confirmModal').classList.add('hidden'); State.deleteTargetId=null; });
+  clone('confirmDelete').addEventListener('click', () => { if (State.deleteTargetId) deleteReceipt(State.deleteTargetId); });
+  document.getElementById('confirmModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('confirmModal')) { document.getElementById('confirmModal').classList.add('hidden'); State.deleteTargetId=null; }
   });
 
-  // Report navigation
-  document.getElementById('reportPrevMonth').addEventListener('click', () => {
-    State.reportMonth--;
-    if (State.reportMonth < 0) { State.reportMonth = 11; State.reportYear--; }
+  /* Report tabs */
+  document.getElementById('tabMine')?.addEventListener('click', () => {
+    State.reportTab = 'mine';
+    document.querySelectorAll('.report-tab').forEach(t => t.classList.toggle('active', t.dataset.tab==='mine'));
     renderReport();
   });
-  document.getElementById('reportNextMonth').addEventListener('click', () => {
-    State.reportMonth++;
-    if (State.reportMonth > 11) { State.reportMonth = 0; State.reportYear++; }
+  document.getElementById('tabTeam')?.addEventListener('click', () => {
+    State.reportTab = 'team';
+    document.querySelectorAll('.report-tab').forEach(t => t.classList.toggle('active', t.dataset.tab==='team'));
     renderReport();
   });
-  document.getElementById('btnGeneratePDF').addEventListener('click', generatePDF);
-  document.getElementById('btnSendReport').addEventListener('click', sendReportEmail);
+  document.getElementById('teamUserSelect')?.addEventListener('change', () => renderTeamReport());
 
-  // Settings
-  document.getElementById('btnSaveSettings').addEventListener('click', () => {
-    State.settings.name = document.getElementById('sName').value.trim();
-    State.settings.email = document.getElementById('sEmail').value.trim();
-    State.settings.employeeId = document.getElementById('sEmployeeId').value.trim();
-    State.settings.company = document.getElementById('sCompany').value.trim();
-    State.settings.department = document.getElementById('sDepartment').value.trim();
+  /* Report month nav */
+  clone('reportPrevMonth').addEventListener('click', () => {
+    State.reportMonth--; if (State.reportMonth<0){State.reportMonth=11;State.reportYear--;} renderReport();
+  });
+  clone('reportNextMonth').addEventListener('click', () => {
+    State.reportMonth++; if (State.reportMonth>11){State.reportMonth=0;State.reportYear++;} renderReport();
+  });
+  clone('btnGeneratePDF').addEventListener('click', () => generatePDF());
+  clone('btnSendReport').addEventListener('click', sendReportEmail);
+  document.getElementById('btnTeamPDF')?.addEventListener('click', generateTeamPDF);
+
+  /* Settings save */
+  clone('btnSaveSettings').addEventListener('click', async () => {
+    if (!State.currentUser) return;
+    const updated = {
+      ...State.currentUser,
+      name:       document.getElementById('sName').value.trim(),
+      email:      document.getElementById('sEmail').value.trim(),
+      employeeId: document.getElementById('sEmployeeId').value.trim(),
+      company:    document.getElementById('sCompany').value.trim(),
+      department: document.getElementById('sDepartment').value.trim()
+    };
+    await DB.updateUser(updated);
+    State.currentUser = updated;
+    const idx = State.allUsers.findIndex(u => u.id === updated.id);
+    if (idx >= 0) State.allUsers[idx] = updated;
+
+    State.settings.company      = document.getElementById('sCompany').value.trim();
     State.settings.managerEmail = document.getElementById('sManagerEmail').value.trim();
-    State.settings.monthlyBudget = parseFloat(document.getElementById('sMonthlyBudget').value) || 2000;
-    State.settings.currency = document.getElementById('sCurrency').value;
-    State.settings.darkMode = document.getElementById('sDarkMode').checked;
-    saveSettings();
-    applyTheme();
-    updateProfileDisplay();
+    State.settings.monthlyBudget= parseFloat(document.getElementById('sMonthlyBudget').value)||2000;
+    State.settings.currency     = document.getElementById('sCurrency').value;
+    State.settings.darkMode     = document.getElementById('sDarkMode').checked;
+    saveSettings(); applyTheme(); updateHeaderUser();
     showToast('Settings saved', 'success');
   });
-
-  document.getElementById('sDarkMode').addEventListener('change', (e) => {
-    State.settings.darkMode = e.target.checked;
-    applyTheme();
+  document.getElementById('sDarkMode').addEventListener('change', e => {
+    State.settings.darkMode = e.target.checked; applyTheme();
   });
 
-  document.getElementById('btnClearData').addEventListener('click', async () => {
+  /* Team management */
+  document.getElementById('btnAddTeamMember')?.addEventListener('click', () => openUserForm());
+  document.getElementById('btnSwitchUser')?.addEventListener('click', () => showLoginScreen_public());
+
+  /* User form modal */
+  clone('closeUserModal').addEventListener('click', () => document.getElementById('userFormModal').classList.add('hidden'));
+  clone('cancelUserForm').addEventListener('click', () => document.getElementById('userFormModal').classList.add('hidden'));
+  clone('confirmUserForm').addEventListener('click', saveUserForm);
+  document.getElementById('userFormModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('userFormModal')) document.getElementById('userFormModal').classList.add('hidden');
+  });
+
+  /* Login screen */
+  document.getElementById('btnAddUserLogin').addEventListener('click', () => {
+    hideLoginScreen();
+    openUserForm();
+  });
+
+  /* Data */
+  clone('btnClearData').addEventListener('click', async () => {
     if (!confirm('Delete ALL receipts? This cannot be undone.')) return;
     await DB.clear();
-    State.receipts = [];
-    renderDashboard();
-    renderReceiptsList();
+    State.receipts = []; State.allReceipts = [];
+    renderDashboard(); renderReceiptsList();
     showToast('All data cleared', 'info');
   });
 
-  // Keyboard shortcut: Escape closes modals
-  document.addEventListener('keydown', (e) => {
+  /* Keyboard shortcuts */
+  document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       closeReceiptModal();
       document.getElementById('confirmModal').classList.add('hidden');
+      document.getElementById('userFormModal').classList.add('hidden');
     }
   });
 
-  // Drag and drop on capture zone
-  const captureZone = document.getElementById('captureZone');
-  captureZone.addEventListener('dragover', (e) => { e.preventDefault(); captureZone.style.opacity = '.7'; });
-  captureZone.addEventListener('dragleave', () => { captureZone.style.opacity = ''; });
-  captureZone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    captureZone.style.opacity = '';
-    const file = e.dataTransfer.files[0];
-    handleFileInput(file);
+  /* Drag & drop on capture zone */
+  const cz = document.getElementById('captureZone');
+  cz.addEventListener('dragover', e => { e.preventDefault(); cz.style.opacity='.7'; });
+  cz.addEventListener('dragleave', () => { cz.style.opacity=''; });
+  cz.addEventListener('drop', e => {
+    e.preventDefault(); cz.style.opacity='';
+    handleFileInput(e.dataTransfer.files[0]);
   });
 }
 
-/* ============================================
-   SAMPLE DATA (first launch)
-   ============================================ */
-async function addSampleData() {
-  const samples = [
-    { merchant: 'Delta Airlines', amount: 342.50, currency: 'USD', category: 'travel', date: (() => { const d = new Date(); d.setDate(d.getDate() - 3); return d.toISOString().split('T')[0]; })(), status: 'approved', description: 'Flight to client meeting NYC', imageData: null },
-    { merchant: 'Marriott Hotel', amount: 189.00, currency: 'USD', category: 'accommodation', date: (() => { const d = new Date(); d.setDate(d.getDate() - 2); return d.toISOString().split('T')[0]; })(), status: 'approved', description: 'Business trip accommodation', imageData: null },
-    { merchant: 'The Capital Grille', amount: 87.40, currency: 'USD', category: 'meals', date: (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().split('T')[0]; })(), status: 'pending', description: 'Client dinner', imageData: null },
-    { merchant: 'Adobe Creative Cloud', amount: 54.99, currency: 'USD', category: 'software', date: new Date().toISOString().split('T')[0], status: 'pending', description: 'Monthly subscription', imageData: null },
-    { merchant: 'Office Depot', amount: 32.15, currency: 'USD', category: 'supplies', date: (() => { const d = new Date(); d.setDate(d.getDate() - 5); return d.toISOString().split('T')[0]; })(), status: 'approved', description: 'Printer paper and pens', imageData: null }
-  ];
+/* ════════════════════════════════
+   BOOT
+   ════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  /* Login screen "add user" button is always accessible */
+  document.getElementById('btnAddUserLogin').addEventListener('click', () => {
+    DB.open().then(() => {
+      DB.getAllUsers().then(users => {
+        State.allUsers = users;
+        hideLoginScreen();
+        openUserForm();
+      });
+    });
+  });
 
-  for (const s of samples) {
-    const id = await DB.add(s);
-    s.id = id;
-    State.receipts.unshift(s);
-  }
-}
+  /* User form confirm (needs DB open before login) */
+  document.getElementById('confirmUserForm').addEventListener('click', async () => {
+    const nameEl = document.getElementById('ufName');
+    if (!nameEl.value.trim()) { showToast('Name is required','error'); return; }
+    const editId = document.getElementById('ufEditId').value;
+    const userData = {
+      name:       document.getElementById('ufName').value.trim(),
+      email:      document.getElementById('ufEmail').value.trim() || '',
+      employeeId: document.getElementById('ufEmployeeId').value.trim() || '',
+      department: document.getElementById('ufDepartment').value.trim() || '',
+      role:       document.getElementById('ufRole').value || 'user'
+    };
+    if (!State.allUsers.length && !editId) userData.role = 'admin';
+    try {
+      if (editId) {
+        userData.id = Number(editId);
+        await DB.updateUser(userData);
+        const idx = State.allUsers.findIndex(u=>u.id===userData.id);
+        if (idx>=0) State.allUsers[idx]=userData;
+      } else {
+        const id = await DB.addUser(userData);
+        userData.id = id;
+        State.allUsers.push(userData);
+      }
+      document.getElementById('userFormModal').classList.add('hidden');
+      if (!State.currentUser) {
+        /* Just created first user — auto-login */
+        await loginUser(userData.id);
+      } else {
+        renderUserManagementList();
+        populateFilterUsers();
+        showToast('Profile saved','success');
+        showLoginScreen();
+      }
+    } catch(err) { console.error(err); showToast('Failed to save','error'); }
+  });
 
-/* ---- Boot ---- */
-document.addEventListener('DOMContentLoaded', async () => {
-  await init();
-  // Add sample data only on first launch
-  if (State.receipts.length === 0) {
-    await addSampleData();
-    State.receipts = await DB.getAll();
-    populateFilterMonths();
-    renderDashboard();
-    showToast('Welcome! Sample data loaded.', 'info');
-  }
+  document.getElementById('cancelUserForm').addEventListener('click', () => {
+    document.getElementById('userFormModal').classList.add('hidden');
+    if (!State.currentUser) showLoginScreen();
+  });
+  document.getElementById('closeUserModal').addEventListener('click', () => {
+    document.getElementById('userFormModal').classList.add('hidden');
+    if (!State.currentUser) showLoginScreen();
+  });
+
+  init();
 });

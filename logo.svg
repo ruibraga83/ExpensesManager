@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 88" fill="none">
+  <defs>
+    <linearGradient id="Lbg" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4338ca"/>
+      <stop offset="55%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="Lsheen" x1="0" y1="0" x2="0" y2="70" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.18)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </linearGradient>
+    <linearGradient id="Ltextgrad" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="#4f46e5"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <clipPath id="LroundClip">
+      <rect width="80" height="80" rx="19" y="4"/>
+    </clipPath>
+    <filter id="Lglow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- ════════════════════════════════
+       ICON MARK  (80×80, left side)
+       ════════════════════════════════ -->
+  <!-- Background rounded square -->
+  <rect x="0" y="4" width="80" height="80" rx="19" fill="url(#Lbg)"/>
+  <rect x="0" y="4" width="80" height="80" rx="19" fill="url(#Lsheen)" clip-path="url(#LroundClip)"/>
+  <rect x="0" y="4" width="80" height="80" rx="19" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+
+  <!-- Icon content scaled 0.8× (100→80) and shifted by y+4 -->
+  <g transform="translate(0,4) scale(0.8)">
+    <!-- Receipt document (lower-left) -->
+    <rect x="8" y="60" width="36" height="33" rx="3" fill="rgba(255,255,255,0.14)"/>
+    <path d="M8,60 L11,54.5 L14,60 L17,54.5 L20,60 L23,54.5 L26,60 L29,54.5 L32,60 L35,54.5 L38,60 L41,54.5 L44,54.5 L44,60 Z"
+          fill="rgba(255,255,255,0.14)"/>
+    <rect x="13" y="66"  width="24" height="2"   rx="1" fill="rgba(255,255,255,0.55)"/>
+    <rect x="13" y="71"  width="16" height="1.8" rx="0.9" fill="rgba(255,255,255,0.35)"/>
+    <rect x="13" y="76"  width="20" height="1.8" rx="0.9" fill="rgba(255,255,255,0.35)"/>
+    <line x1="13" y1="80.5" x2="39" y2="80.5" stroke="rgba(255,255,255,0.25)" stroke-width="0.8" stroke-dasharray="2.5,2"/>
+    <rect x="13" y="84"  width="24" height="2"   rx="1" fill="rgba(255,255,255,0.55)"/>
+
+    <!-- Airplane -->
+    <g transform="rotate(-40, 50, 50)" fill="white" filter="url(#Lglow)">
+      <path d="M88,50 C88,46.5 76,43.5 60,43.5 Q40,43 22,45 L22,55 Q40,57 60,56.5 C76,56.5 88,53.5 88,50 Z"/>
+      <path d="M54,43.5 C56,36 59,24 62,15 L71,43.5 Z"/>
+      <path d="M54,56.5 C56,64 59,76 62,85 L71,56.5 Z"/>
+      <ellipse cx="61" cy="27" rx="6" ry="2.2" opacity="0.88"/>
+      <ellipse cx="61" cy="73" rx="6" ry="2.2" opacity="0.88"/>
+      <path d="M27,45.5 C25,42 21,39 15,37 L23,45.5 Z" opacity="0.82"/>
+      <path d="M27,54.5 C25,58 21,61 15,63 L23,54.5 Z" opacity="0.82"/>
+      <circle cx="70" cy="48.5" r="1.2" fill="rgba(180,200,255,0.5)"/>
+      <circle cx="65" cy="48.5" r="1.2" fill="rgba(180,200,255,0.5)"/>
+      <circle cx="60" cy="48.5" r="1.2" fill="rgba(180,200,255,0.5)"/>
+      <circle cx="55" cy="48.5" r="1.2" fill="rgba(180,200,255,0.5)"/>
+      <circle cx="50" cy="48.5" r="1.2" fill="rgba(180,200,255,0.4)"/>
+    </g>
+
+    <!-- Contrail dots -->
+    <circle cx="76" cy="16" r="2"   fill="rgba(255,255,255,0.35)"/>
+    <circle cx="83" cy="22" r="1.4" fill="rgba(255,255,255,0.25)"/>
+    <circle cx="88" cy="14" r="1"   fill="rgba(255,255,255,0.18)"/>
+  </g>
+
+  <!-- ════════════════════════════════
+       LOGOTYPE TEXT  (right side)
+       ════════════════════════════════ -->
+
+  <!-- "ExpenseTracker" — bold wordmark -->
+  <text x="96" y="40"
+        font-family="'Segoe UI', 'SF Pro Display', -apple-system, system-ui, sans-serif"
+        font-weight="800"
+        font-size="27"
+        letter-spacing="-0.6"
+        fill="#1e293b">ExpenseTracker</text>
+
+  <!-- Thin accent rule under wordmark -->
+  <rect x="96" y="46" width="218" height="1.5" rx="0.75" fill="url(#Ltextgrad)" opacity="0.25"/>
+
+  <!-- "by lIqUiDuS" tagline -->
+  <text x="97" y="63"
+        font-family="'Segoe UI', 'SF Pro Text', -apple-system, system-ui, sans-serif"
+        font-size="15"
+        letter-spacing="0.3">
+    <tspan font-weight="400" fill="#94a3b8">by </tspan><tspan font-weight="700" fill="url(#Ltextgrad)">lIqUiDuS</tspan>
+  </text>
+
+  <!-- Subtle tagline below -->
+  <text x="97" y="78"
+        font-family="'Segoe UI', 'SF Pro Text', -apple-system, system-ui, sans-serif"
+        font-weight="400"
+        font-size="10.5"
+        letter-spacing="0.5"
+        fill="#cbd5e1">AVIATION EXPENSE MANAGEMENT</text>
+</svg>

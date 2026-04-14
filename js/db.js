@@ -1,87 +1,111 @@
 /* ============================================
-   EXPENSEFLOW — IndexedDB Layer
+   EXPENSETRACKER — IndexedDB Layer  v2
    ============================================ */
 
 const DB = (() => {
-  const DB_NAME = 'ExpenseFlow';
-  const DB_VERSION = 1;
+  const DB_NAME = 'ExpenseTracker';
+  const DB_VERSION = 2;
   let _db = null;
 
   function open() {
     return new Promise((resolve, reject) => {
       if (_db) return resolve(_db);
-
       const req = indexedDB.open(DB_NAME, DB_VERSION);
 
       req.onupgradeneeded = (e) => {
-        const db = e.target.result;
-        if (!db.objectStoreNames.contains('receipts')) {
-          const store = db.createObjectStore('receipts', { keyPath: 'id', autoIncrement: true });
-          store.createIndex('date', 'date', { unique: false });
-          store.createIndex('category', 'category', { unique: false });
-          store.createIndex('status', 'status', { unique: false });
-          store.createIndex('createdAt', 'createdAt', { unique: false });
+        const db  = e.target.result;
+        const tx  = e.target.transaction;
+        const old = e.oldVersion;
+
+        /* ── receipts store (created fresh or upgraded) ── */
+        if (old < 1) {
+          const rs = db.createObjectStore('receipts', { keyPath: 'id', autoIncrement: true });
+          rs.createIndex('date',      'date');
+          rs.createIndex('category',  'category');
+          rs.createIndex('status',    'status');
+          rs.createIndex('createdAt', 'createdAt');
+          rs.createIndex('userId',    'userId');
+        } else if (!tx.objectStore('receipts').indexNames.contains('userId')) {
+          /* upgrading from v1 — add userId index to existing store */
+          tx.objectStore('receipts').createIndex('userId', 'userId');
+        }
+
+        /* ── users store (v2 addition) ── */
+        if (old < 2) {
+          const us = db.createObjectStore('users', { keyPath: 'id', autoIncrement: true });
+          us.createIndex('email', 'email');
+          us.createIndex('role',  'role');
         }
       };
 
       req.onsuccess = (e) => { _db = e.target.result; resolve(_db); };
-      req.onerror = (e) => reject(e.target.error);
+      req.onerror   = (e) => reject(e.target.error);
     });
   }
 
-  function tx(mode = 'readonly') {
-    return _db.transaction('receipts', mode).objectStore('receipts');
+  /* ── helpers ── */
+  function _store(name, mode = 'readonly') {
+    return _db.transaction(name, mode).objectStore(name);
+  }
+  function _wrap(req) {
+    return new Promise((res, rej) => {
+      req.onsuccess = () => res(req.result);
+      req.onerror   = () => rej(req.error);
+    });
   }
 
+  /* ════════════════════════════════
+     RECEIPTS
+     ════════════════════════════════ */
   function getAll() {
-    return new Promise((resolve, reject) => {
-      const req = tx().getAll();
-      req.onsuccess = () => resolve(req.result.sort((a, b) => new Date(b.date) - new Date(a.date)));
-      req.onerror = () => reject(req.error);
-    });
+    return _wrap(_store('receipts').getAll())
+      .then(rows => rows.sort((a, b) => new Date(b.date) - new Date(a.date)));
   }
 
-  function getById(id) {
-    return new Promise((resolve, reject) => {
-      const req = tx().get(id);
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
+  function getAllByUser(userId) {
+    return getAll().then(rows => rows.filter(r => r.userId === userId));
   }
+
+  function getById(id) { return _wrap(_store('receipts').get(id)); }
 
   function add(receipt) {
-    return new Promise((resolve, reject) => {
-      receipt.createdAt = new Date().toISOString();
-      const req = tx('readwrite').add(receipt);
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
+    receipt.createdAt = new Date().toISOString();
+    return _wrap(_store('receipts', 'readwrite').add(receipt));
   }
 
   function update(receipt) {
-    return new Promise((resolve, reject) => {
-      receipt.updatedAt = new Date().toISOString();
-      const req = tx('readwrite').put(receipt);
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
+    receipt.updatedAt = new Date().toISOString();
+    return _wrap(_store('receipts', 'readwrite').put(receipt));
   }
 
-  function remove(id) {
-    return new Promise((resolve, reject) => {
-      const req = tx('readwrite').delete(id);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
-    });
+  function remove(id)  { return _wrap(_store('receipts', 'readwrite').delete(id)); }
+  function clear()     { return _wrap(_store('receipts', 'readwrite').clear()); }
+
+  /* ════════════════════════════════
+     USERS
+     ════════════════════════════════ */
+  function getAllUsers() {
+    return _wrap(_store('users').getAll())
+      .then(rows => rows.sort((a, b) => a.id - b.id));
   }
 
-  function clear() {
-    return new Promise((resolve, reject) => {
-      const req = tx('readwrite').clear();
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
-    });
+  function getUserById(id)   { return _wrap(_store('users').get(id)); }
+
+  function addUser(user) {
+    user.createdAt = new Date().toISOString();
+    return _wrap(_store('users', 'readwrite').add(user));
   }
 
-  return { open, getAll, getById, add, update, remove, clear };
+  function updateUser(user) {
+    user.updatedAt = new Date().toISOString();
+    return _wrap(_store('users', 'readwrite').put(user));
+  }
+
+  function removeUser(id) { return _wrap(_store('users', 'readwrite').delete(id)); }
+
+  return {
+    open,
+    getAll, getAllByUser, getById, add, update, remove, clear,
+    getAllUsers, getUserById, addUser, updateUser, removeUser
+  };
 })();
