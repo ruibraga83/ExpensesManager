@@ -93,7 +93,7 @@ async function init() {
     if (savedId && State.allUsers.find(u => u.id === savedId)) {
       await loginUser(savedId, true);
     } else {
-      showLoginScreen();
+      _showLoginScreen();
     }
   } catch (err) {
     console.error('Init error:', err);
@@ -115,7 +115,7 @@ function hideSplash() {
 /* ════════════════════════════════
    LOGIN / USER SESSION
    ════════════════════════════════ */
-async function showLoginScreen() {
+async function _showLoginScreen() {
   State.allUsers = await DB.getAllUsers().catch(() => State.allUsers);
   const screen = document.getElementById('loginScreen');
   screen.classList.remove('hidden');
@@ -149,7 +149,7 @@ function renderUserGrid() {
 
 async function loginUser(userId, skipAnim = false) {
   const user = await DB.getUserById(userId);
-  if (!user) { showLoginScreen(); return; }
+  if (!user) { _showLoginScreen(); return; }
   State.currentUser = user;
   localStorage.setItem('et_userId', userId);
 
@@ -174,7 +174,7 @@ async function loginUser(userId, skipAnim = false) {
 function showLoginScreen_public() {
   localStorage.removeItem('et_userId');
   State.currentUser = null;
-  showLoginScreen();
+  _showLoginScreen();
 }
 window.showLoginScreen = showLoginScreen_public;
 
@@ -1331,18 +1331,18 @@ document.addEventListener('DOMContentLoaded', () => {
         renderUserManagementList();
         populateFilterUsers();
         showToast('Profile saved','success');
-        showLoginScreen();
+        _showLoginScreen();
       }
     } catch(err) { console.error(err); showToast('Failed to save','error'); }
   });
 
   document.getElementById('cancelUserForm').addEventListener('click', () => {
     document.getElementById('userFormModal').classList.add('hidden');
-    if (!State.currentUser) showLoginScreen();
+    if (!State.currentUser) _showLoginScreen();
   });
   document.getElementById('closeUserModal').addEventListener('click', () => {
     document.getElementById('userFormModal').classList.add('hidden');
-    if (!State.currentUser) showLoginScreen();
+    if (!State.currentUser) _showLoginScreen();
   });
 
   init();
