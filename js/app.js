@@ -34,7 +34,7 @@ const State = {
 const CATEGORIES = {
   meals:         { label: 'Meals',     emoji: '🍽️', color: '#d97706' },
   travel:        { label: 'Travel',    emoji: '✈️', color: '#2563eb' },
-  accommodation: { label: 'Hotel',     emoji: '🏨', color: '#7c3aed' },
+  accommodation: { label: 'Hotel',     emoji: '🏨', color: '#5A28A0' },
   software:      { label: 'Software',  emoji: '🖥️', color: '#16a34a' },
   supplies:      { label: 'Supplies',  emoji: '📦', color: '#ea580c' },
   entertainment: { label: 'Events',    emoji: '🎭', color: '#db2777' },
@@ -44,9 +44,9 @@ const CATEGORIES = {
 };
 
 const AVATAR_COLORS = [
-  '#6366f1','#8b5cf6','#ec4899','#14b8a6',
-  '#f59e0b','#ef4444','#10b981','#3b82f6',
-  '#a855f7','#06b6d4','#84cc16','#f97316'
+  '#7A5808','#1A6A40','#B02018','#3060A8',
+  '#5A28A0','#186868','#A03818','#285888',
+  '#801848','#386828','#884818','#205878'
 ];
 
 /* ════════════════════════════════
@@ -219,8 +219,8 @@ function populateSettingsForm() {
   document.getElementById('settingsAvatarName').textContent = u.name  || 'Set your name';
   document.getElementById('settingsAvatarEmail').textContent= u.email || 'Add your email';
   if (u.id) {
-    document.getElementById('settingsAvatar').style.background =
-      `linear-gradient(135deg, ${avatarColor(u.id)}, ${avatarColor(u.id + 2)})`;
+    document.getElementById('settingsAvatar').style.background = '';
+    document.getElementById('settingsAvatar').style.color = '';
   }
 
   // Team management visibility (admin only)
@@ -832,9 +832,9 @@ async function generatePDF(receiptsOverride, titleOverride) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageW = doc.internal.pageSize.getWidth();
 
-  /* Header band */
-  doc.setFillColor(99, 102, 241); doc.rect(0, 0, pageW, 40, 'F');
-  doc.setFillColor(124, 58, 237); doc.rect(pageW-55, 0, 55, 40, 'F');
+  /* Header band — brass palette */
+  doc.setFillColor(19, 16, 8); doc.rect(0, 0, pageW, 40, 'F');
+  doc.setFillColor(122, 88, 8); doc.rect(pageW-55, 0, 55, 40, 'F');
   doc.setTextColor(255,255,255);
   doc.setFont('helvetica','bold'); doc.setFontSize(20);
   doc.text('ExpenseTracker', 14, 15);
@@ -860,9 +860,9 @@ async function generatePDF(receiptsOverride, titleOverride) {
   const bY = 48, bW = (pageW-28-9)/4;
   boxes.forEach((box, i) => {
     const x = 14 + i*(bW+3);
-    doc.setFillColor(248,250,252); doc.roundedRect(x, bY, bW, 20, 2, 2, 'F');
-    doc.setDrawColor(226,232,240); doc.roundedRect(x, bY, bW, 20, 2, 2, 'S');
-    doc.setTextColor(100,116,139); doc.setFont('helvetica','normal'); doc.setFontSize(7);
+    doc.setFillColor(244,241,235); doc.roundedRect(x, bY, bW, 20, 2, 2, 'F');
+    doc.setDrawColor(216,210,196); doc.roundedRect(x, bY, bW, 20, 2, 2, 'S');
+    doc.setTextColor(152,142,126); doc.setFont('helvetica','normal'); doc.setFontSize(7);
     doc.text(box.label.toUpperCase(), x+bW/2, bY+7, { align:'center' });
     doc.setTextColor(30,41,59); doc.setFont('helvetica','bold'); doc.setFontSize(i===0?9:11);
     doc.text(box.value, x+bW/2, bY+15, { align:'center' });
@@ -887,8 +887,8 @@ async function generatePDF(receiptsOverride, titleOverride) {
       doc.setTextColor(30,41,59); doc.setFont('helvetica','bold');
       doc.text(formatCurrency(amt,currency), pageW-14, y, {align:'right'});
       const bx=93, bw2=pageW-14-bx-30, bf=(amt/total)*bw2;
-      doc.setFillColor(226,232,240); doc.roundedRect(bx, y-3.5, bw2, 3, 1, 1, 'F');
-      doc.setFillColor(99,102,241);  doc.roundedRect(bx, y-3.5, bf,  3, 1, 1, 'F');
+      doc.setFillColor(216,210,196); doc.roundedRect(bx, y-3.5, bw2, 3, 1, 1, 'F');
+      doc.setFillColor(122, 88,  8); doc.roundedRect(bx, y-3.5, bf,  3, 1, 1, 'F');
     });
   }
 
@@ -995,7 +995,7 @@ function renderUserManagementList() {
     return `<div class="user-row">
       <div class="user-row-avatar" style="background:${color}">${initials(u.name)}</div>
       <div class="user-row-info">
-        <div class="user-row-name">${escapeHtml(u.name)} ${isSelf?'<span style="font-size:.7rem;color:var(--primary)">(you)</span>':''}</div>
+        <div class="user-row-name">${escapeHtml(u.name)} ${isSelf?'<span style="font-size:.68rem;color:var(--accent)">(you)</span>':''}</div>
         <div class="user-row-email">${roleLbl}${u.email?' · '+escapeHtml(u.email):''}</div>
       </div>
       <div class="user-row-actions">

@@ -2,17 +2,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 88" fill="none">
   <defs>
     <linearGradient id="Lbg" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#4338ca"/>
-      <stop offset="55%" stop-color="#6366f1"/>
-      <stop offset="100%" stop-color="#7c3aed"/>
+      <stop offset="0%" stop-color="#131008"/>
+      <stop offset="55%" stop-color="#2A2018"/>
+      <stop offset="100%" stop-color="#7A5808"/>
     </linearGradient>
     <linearGradient id="Lsheen" x1="0" y1="0" x2="0" y2="70" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="rgba(255,255,255,0.18)"/>
+      <stop offset="0%" stop-color="rgba(255,255,255,0.12)"/>
       <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
     </linearGradient>
     <linearGradient id="Ltextgrad" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
-      <stop offset="0%" stop-color="#4f46e5"/>
-      <stop offset="100%" stop-color="#7c3aed"/>
+      <stop offset="0%" stop-color="#7A5808"/>
+      <stop offset="100%" stop-color="#A07820"/>
     </linearGradient>
     <clipPath id="LroundClip">
       <rect width="80" height="80" rx="19" y="4"/>
@@ -75,17 +75,17 @@
         font-weight="800"
         font-size="27"
         letter-spacing="-0.6"
-        fill="#1e293b">ExpenseTracker</text>
+        fill="#131008">ExpenseTracker</text>
 
   <!-- Thin accent rule under wordmark -->
-  <rect x="96" y="46" width="218" height="1.5" rx="0.75" fill="url(#Ltextgrad)" opacity="0.25"/>
+  <rect x="96" y="46" width="218" height="1.5" rx="0.75" fill="url(#Ltextgrad)" opacity="0.35"/>
 
   <!-- "by lIqUiDuS" tagline -->
   <text x="97" y="63"
         font-family="'Segoe UI', 'SF Pro Text', -apple-system, system-ui, sans-serif"
         font-size="15"
         letter-spacing="0.3">
-    <tspan font-weight="400" fill="#94a3b8">by </tspan><tspan font-weight="700" fill="url(#Ltextgrad)">lIqUiDuS</tspan>
+    <tspan font-weight="400" fill="#988E7E">by </tspan><tspan font-weight="700" fill="url(#Ltextgrad)">lIqUiDuS</tspan>
   </text>
 
   <!-- Subtle tagline below -->
@@ -94,5 +94,5 @@
         font-weight="400"
         font-size="10.5"
         letter-spacing="0.5"
-        fill="#cbd5e1">AVIATION EXPENSE MANAGEMENT</text>
+        fill="#C0BAA8">AVIATION EXPENSE MANAGEMENT</text>
 </svg>

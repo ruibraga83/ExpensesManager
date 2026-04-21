@@ -2,9 +2,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#4338ca"/>
-      <stop offset="55%" stop-color="#6366f1"/>
-      <stop offset="100%" stop-color="#7c3aed"/>
+      <stop offset="0%" stop-color="#131008"/>
+      <stop offset="55%" stop-color="#2A2018"/>
+      <stop offset="100%" stop-color="#7A5808"/>
     </linearGradient>
     <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="70" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="rgba(255,255,255,0.18)"/>
