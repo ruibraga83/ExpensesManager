@@ -24,7 +24,7 @@ const State = {
   cameraStream: null,
   settings: {
     company: '', managerEmail: '', currency: 'USD',
-    monthlyBudget: 2000, darkMode: false
+    monthlyBudget: 2000, darkMode: false, adminPin: ''
   }
 };
 
@@ -223,12 +223,56 @@ function populateSettingsForm() {
     document.getElementById('settingsAvatar').style.color = '';
   }
 
-  // Team management visibility (admin only)
-  document.getElementById('teamManagementSection').style.display = isAdmin() ? '' : 'none';
-  if (isAdmin()) renderUserManagementList();
+  // Admin-only sections
+  const adminVisible = isAdmin() ? '' : 'none';
+  document.getElementById('teamManagementSection').style.display = adminVisible;
+  document.getElementById('securitySection').classList.toggle('hidden', !isAdmin());
+  if (isAdmin()) {
+    document.getElementById('sAdminPin').value = s.adminPin || '';
+    renderUserManagementList();
+  }
 }
 
 function applyTheme() { document.body.classList.toggle('dark', State.settings.darkMode); }
+
+/* Promise-based PIN gate — resolves true (correct) or false (cancelled / wrong) */
+function verifyAdminPin() {
+  return new Promise(resolve => {
+    const modal    = document.getElementById('pinModal');
+    const input    = document.getElementById('pinInput');
+    const confirmB = document.getElementById('pinConfirm');
+    const cancelB  = document.getElementById('pinCancel');
+    const form     = document.getElementById('pinForm');
+
+    input.value = '';
+    modal.classList.remove('hidden');
+    setTimeout(() => input.focus(), 80);
+
+    function close(result) {
+      modal.classList.add('hidden');
+      confirmB.removeEventListener('click', onConfirm);
+      cancelB.removeEventListener('click', onCancel);
+      form.removeEventListener('submit', onConfirm);
+      resolve(result);
+    }
+
+    function onConfirm() {
+      if (input.value === State.settings.adminPin) {
+        close(true);
+      } else {
+        showToast('Incorrect PIN', 'error');
+        input.value = '';
+        input.focus();
+      }
+    }
+
+    function onCancel() { close(false); }
+
+    confirmB.addEventListener('click', onConfirm);
+    cancelB.addEventListener('click', onCancel);
+    form.addEventListener('submit', onConfirm);
+  });
+}
 
 /* ════════════════════════════════
    NAVIGATION
@@ -567,12 +611,32 @@ async function startDesktopCamera() {
   }
 }
 
+/* Resize + re-encode to JPEG, capping longest edge at maxDim px */
+function compressImage(dataUrl, maxDim = 1600, quality = 0.75) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      let { naturalWidth: w, naturalHeight: h } = img;
+      if (w > maxDim || h > maxDim) {
+        if (w >= h) { h = Math.round(h * maxDim / w); w = maxDim; }
+        else        { w = Math.round(w * maxDim / h); h = maxDim; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => resolve(dataUrl); // fallback: keep original
+    img.src = dataUrl;
+  });
+}
+
 function captureFromVideo() {
   const video  = document.getElementById('cameraStream');
   const canvas = document.getElementById('captureCanvas');
   canvas.width = video.videoWidth; canvas.height = video.videoHeight;
   canvas.getContext('2d').drawImage(video, 0, 0);
-  setCapuredImage(canvas.toDataURL('image/jpeg', 0.85));
+  compressImage(canvas.toDataURL('image/jpeg', 1), 1600, 0.75).then(setCapuredImage);
   stopCameraStream();
 }
 
@@ -594,7 +658,7 @@ function setCapuredImage(dataUrl) {
 function handleFileInput(file) {
   if (!file || !file.type.startsWith('image/')) return;
   const reader = new FileReader();
-  reader.onload = e => setCapuredImage(e.target.result);
+  reader.onload = e => compressImage(e.target.result, 1600, 0.75).then(setCapuredImage);
   reader.readAsDataURL(file);
 }
 
@@ -1142,16 +1206,30 @@ function openUserForm(userId = null) {
 async function saveUserForm() {
   const nameEl = document.getElementById('ufName');
   if (!nameEl.value.trim()) { showToast('Name is required', 'error'); return; }
-  const editId = document.getElementById('ufEditId').value;
+  const editId       = document.getElementById('ufEditId').value;
+  const selectedRole = document.getElementById('ufRole').value || 'user';
+
+  /* PIN gate — elevated roles require verification when a PIN is configured */
+  const elevatedRole = ['admin', 'finance'].includes(selectedRole);
+  const firstUser    = !State.allUsers.length && !editId;
+  if (isAdmin() && elevatedRole && !firstUser) {
+    if (State.settings.adminPin) {
+      const ok = await verifyAdminPin();
+      if (!ok) return;
+    } else {
+      showToast('Tip: set an Admin PIN in Settings → Security', 'info');
+    }
+  }
+
   const userData = {
     name:       document.getElementById('ufName').value.trim(),
     email:      document.getElementById('ufEmail').value.trim(),
     employeeId: document.getElementById('ufEmployeeId').value.trim(),
     department: document.getElementById('ufDepartment').value.trim(),
-    role:       document.getElementById('ufRole').value || 'user'
+    role:       selectedRole
   };
   /* First user always gets admin */
-  if (!State.allUsers.length && !editId) userData.role = 'admin';
+  if (firstUser) userData.role = 'admin';
 
   try {
     if (editId) {
@@ -1332,6 +1410,10 @@ function setupEventListeners() {
     State.settings.monthlyBudget= parseFloat(document.getElementById('sMonthlyBudget').value)||2000;
     State.settings.currency     = document.getElementById('sCurrency').value;
     State.settings.darkMode     = document.getElementById('sDarkMode').checked;
+    if (isAdmin()) {
+      const pin = document.getElementById('sAdminPin').value.trim();
+      State.settings.adminPin = pin;
+    }
     saveSettings(); applyTheme(); updateHeaderUser();
     showToast('Settings saved', 'success');
   });
