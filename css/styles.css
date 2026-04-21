@@ -433,7 +433,7 @@ button:focus-visible { border-radius: var(--radius); }
   border-right: 1px solid var(--border) !important;
   padding: 10px 8px !important; font-weight: 600; font-size: 1rem;
   color: var(--text-2); -webkit-text-fill-color: var(--text-2);
-  width: 80px; flex-shrink: 0;
+  width: 80px !important; flex-shrink: 0;
   font-family: 'Space Mono', monospace;
   background-image: none !important;
 }
@@ -441,7 +441,7 @@ button:focus-visible { border-radius: var(--radius); }
   border: none !important; box-shadow: none !important;
   background: transparent !important; border-radius: 0 !important;
   font-size: 1.5rem !important; font-weight: 700;
-  color: var(--text-1) !important; flex: 1; padding: 8px 14px;
+  color: var(--text-1) !important; flex: 1 !important; width: auto !important; padding: 8px 14px;
   font-family: 'Space Mono', monospace;
   -webkit-text-fill-color: var(--text-1) !important;
 }
