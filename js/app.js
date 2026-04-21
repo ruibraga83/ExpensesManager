@@ -813,9 +813,19 @@ function renderReportReceiptsList(receipts, containerId) {
 /* ════════════════════════════════
    PDF GENERATION
    ════════════════════════════════ */
-async function generatePDF(receiptsOverride, titleOverride) {
+/* Resolve pixel dimensions of a base64 image without drawing to canvas */
+function imageNaturalSize(dataUrl) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload  = () => resolve({ w: img.naturalWidth,  h: img.naturalHeight });
+    img.onerror = () => resolve({ w: 0, h: 0 });
+    img.src = dataUrl;
+  });
+}
+
+async function generatePDF(receiptsOverride, titleOverride, returnBlob = false) {
   const { jsPDF } = window.jspdf;
-  if (!jsPDF) { showToast('PDF library not loaded', 'error'); return; }
+  if (!jsPDF) { showToast('PDF library not loaded', 'error'); return null; }
 
   const month = State.reportMonth, year = State.reportYear;
   const monthLabel = getMonthLabel(year, month);
@@ -830,9 +840,10 @@ async function generatePDF(receiptsOverride, titleOverride) {
   const reportTitle = titleOverride || `${u.name || 'Employee'} — ${monthLabel}`;
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const pageW = doc.internal.pageSize.getWidth();
+  const pageW  = doc.internal.pageSize.getWidth();
+  const pageH  = doc.internal.pageSize.getHeight();
 
-  /* Header band — brass palette */
+  /* ── Header band ── */
   doc.setFillColor(19, 16, 8); doc.rect(0, 0, pageW, 40, 'F');
   doc.setFillColor(122, 88, 8); doc.rect(pageW-55, 0, 55, 40, 'F');
   doc.setTextColor(255,255,255);
@@ -841,13 +852,11 @@ async function generatePDF(receiptsOverride, titleOverride) {
   doc.setFont('helvetica','normal'); doc.setFontSize(9);
   doc.text('by lIqUiDuS  ·  Aviation Expense Management', 14, 22);
   doc.setFontSize(11); doc.text(reportTitle, 14, 33);
-
-  /* Right side meta */
   doc.setFontSize(9);
   doc.text(s.company || 'Company', pageW-14, 10, { align:'right' });
   doc.text(`Generated: ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}`, pageW-14, 17, { align:'right' });
 
-  /* Summary boxes */
+  /* ── Summary boxes ── */
   const total    = receipts.reduce((s, r) => s + Number(r.amount), 0);
   const pending  = receipts.filter(r => r.status==='pending').length;
   const approved = receipts.filter(r => r.status==='approved').length;
@@ -868,7 +877,7 @@ async function generatePDF(receiptsOverride, titleOverride) {
     doc.text(box.value, x+bW/2, bY+15, { align:'center' });
   });
 
-  /* Category breakdown */
+  /* ── Category breakdown ── */
   const catY = bY+28;
   const byCategory = {};
   receipts.forEach(r => { byCategory[r.category]=(byCategory[r.category]||0)+Number(r.amount); });
@@ -876,7 +885,7 @@ async function generatePDF(receiptsOverride, titleOverride) {
   if (catEntries.length) {
     doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(30,41,59);
     doc.text('By Category', 14, catY);
-    doc.setDrawColor(226,232,240); doc.line(14, catY+2, pageW-14, catY+2);
+    doc.setDrawColor(216,210,196); doc.line(14, catY+2, pageW-14, catY+2);
     catEntries.forEach(([cat,amt],i)=>{
       const info = CATEGORIES[cat]||CATEGORIES.other;
       const y = catY+9+i*7;
@@ -892,7 +901,7 @@ async function generatePDF(receiptsOverride, titleOverride) {
     });
   }
 
-  /* Receipts table */
+  /* ── Receipts table ── */
   const tY = catY+12+catEntries.length*7;
   doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(30,41,59);
   doc.text('Receipts Detail', 14, tY);
@@ -920,20 +929,69 @@ async function generatePDF(receiptsOverride, titleOverride) {
       }),
       foot: [[...Array(cols.length-2).fill(''), 'TOTAL', formatCurrency(total,currency)]],
       styles: { fontSize:8.5, cellPadding:2.8 },
-      headStyles: { fillColor:[99,102,241], textColor:255, fontStyle:'bold' },
-      footStyles: { fillColor:[241,245,249], textColor:[30,41,59], fontStyle:'bold' },
-      alternateRowStyles: { fillColor:[248,250,252] },
+      headStyles: { fillColor:[19,16,8], textColor:255, fontStyle:'bold' },
+      footStyles: { fillColor:[244,241,235], textColor:[19,16,8], fontStyle:'bold' },
+      alternateRowStyles: { fillColor:[249,247,243] },
       columnStyles: { [cols.length-1]: { halign:'right', fontStyle:'bold' } },
       margin: { left:14, right:14 }
     });
   }
 
-  /* Footer */
+  /* ── Receipt image appendix (one image per page) ── */
+  const withImages = receipts.filter(r => r.imageData);
+  if (withImages.length) {
+    /* Section divider page */
+    doc.addPage();
+    doc.setFillColor(19, 16, 8); doc.rect(0, 0, pageW, pageH, 'F');
+    doc.setFillColor(122, 88, 8); doc.rect(0, pageH-2, pageW, 2, 'F');
+    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(26);
+    doc.text('Receipt', pageW/2, pageH/2-10, { align:'center' });
+    doc.text('Images', pageW/2, pageH/2+6, { align:'center' });
+    doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(200,180,100);
+    doc.text(`${withImages.length} of ${receipts.length} receipts have an attached image`, pageW/2, pageH/2+20, { align:'center' });
+
+    for (const r of withImages) {
+      doc.addPage();
+      const fmt = r.imageData.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+
+      /* Header band for this receipt */
+      doc.setFillColor(244,241,235); doc.rect(0, 0, pageW, 24, 'F');
+      doc.setFillColor(122, 88, 8); doc.rect(0, 23.5, pageW, 0.5, 'F');
+      doc.setTextColor(19,16,8); doc.setFont('helvetica','bold'); doc.setFontSize(13);
+      doc.text(r.merchant || '—', 14, 10);
+      doc.setFont('helvetica','bold'); doc.setFontSize(13);
+      doc.text(formatCurrency(r.amount, r.currency || currency), pageW-14, 10, { align:'right' });
+      doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(90,80,60);
+      const catLabel = (CATEGORIES[r.category]||CATEGORIES.other).label;
+      const statusLabel = r.status.charAt(0).toUpperCase()+r.status.slice(1);
+      doc.text(`${formatDate(r.date)}  ·  ${catLabel}  ·  ${statusLabel}${r.location?' · '+r.location:''}`, 14, 19);
+      if (r.description) {
+        doc.setFontSize(7.5); doc.setTextColor(120,108,88);
+        doc.text(r.description.slice(0,120), 14, 21.5);
+      }
+
+      /* Embed image — fit within content area preserving aspect ratio */
+      try {
+        const { w: natW, h: natH } = await imageNaturalSize(r.imageData);
+        const maxW = pageW - 28;
+        const maxH = pageH - 24 - 14; /* below header, above footer */
+        let imgW = maxW, imgH = maxW * (natH / natW || 1);
+        if (imgH > maxH) { imgH = maxH; imgW = maxH * (natW / natH || 1); }
+        const imgX = (pageW - imgW) / 2;
+        doc.addImage(r.imageData, fmt, imgX, 28, imgW, imgH, undefined, 'FAST');
+      } catch {
+        doc.setTextColor(150,130,100); doc.setFont('helvetica','normal'); doc.setFontSize(9);
+        doc.text('[Image could not be embedded]', pageW/2, pageH/2, { align:'center' });
+      }
+    }
+  }
+
+  /* ── Footers on every page ── */
   const pages = doc.internal.getNumberOfPages();
   for (let i=1; i<=pages; i++) {
     doc.setPage(i);
-    const fY = doc.internal.pageSize.getHeight()-8;
-    doc.setFontSize(7.5); doc.setTextColor(148,163,184); doc.setFont('helvetica','normal');
+    const fY = pageH - 8;
+    doc.setFontSize(7.5); doc.setTextColor(152,142,126); doc.setFont('helvetica','normal');
     doc.text('ExpenseTracker — Confidential · by lIqUiDuS', 14, fY);
     doc.text(`Page ${i} of ${pages}`, pageW-14, fY, {align:'right'});
     if (s.company) doc.text(s.company, pageW/2, fY, {align:'center'});
@@ -941,8 +999,12 @@ async function generatePDF(receiptsOverride, titleOverride) {
 
   const name  = (u.name||'report').replace(/\s+/g,'_');
   const fname = `ExpenseReport_${year}_${String(month+1).padStart(2,'0')}_${name}.pdf`;
+
+  if (returnBlob) return doc.output('blob');
+
   doc.save(fname);
-  showToast('PDF downloaded!', 'success');
+  showToast('PDF downloaded', 'success');
+  return null;
 }
 
 async function generateTeamPDF() {
@@ -960,26 +1022,65 @@ async function generateTeamPDF() {
   await generatePDF(receipts, `${titleSuffix} · ${getMonthLabel(year, month)}`);
 }
 
-function sendReportEmail() {
+async function sendReportEmail() {
   const s = State.settings;
   if (!s.managerEmail) { showToast('Add manager email in Settings first', 'info'); navigate('settings'); return; }
+
   const month = State.reportMonth, year = State.reportYear;
   const monthLabel = getMonthLabel(year, month);
   const receipts = State.receipts.filter(r => {
     const d = new Date(r.date + 'T00:00:00');
     return d.getMonth() === month && d.getFullYear() === year;
   });
-  const total = receipts.reduce((sum,r) => sum+Number(r.amount), 0);
-  const u = State.currentUser || {};
-  const subject = encodeURIComponent(`Expense Report — ${monthLabel} — ${u.name||'Employee'}`);
-  const body = encodeURIComponent(
-    `Hi,\n\nPlease find my expense report for ${monthLabel}.\n\n` +
-    `Employee: ${u.name||'—'}\nDepartment: ${u.department||'—'}\nEmployee ID: ${u.employeeId||'—'}\n` +
-    `Period: ${monthLabel}\nTotal Amount: ${formatCurrency(total, s.currency)}\nReceipts: ${receipts.length}\n\n` +
-    `Please download the PDF report from ExpenseTracker for the complete breakdown.\n\nBest regards,\n${u.name||'Employee'}`
-  );
-  window.location.href = `mailto:${s.managerEmail}?subject=${subject}&body=${body}`;
-  showToast('Opening email client...', 'info');
+  const total   = receipts.reduce((sum,r) => sum+Number(r.amount), 0);
+  const u       = State.currentUser || {};
+  const subject = `Expense Report — ${monthLabel} — ${u.name||'Employee'}`;
+  const imgCount = receipts.filter(r => r.imageData).length;
+  const bodyText =
+    `Hi,\n\nPlease find attached my expense report for ${monthLabel}.\n\n` +
+    `Employee : ${u.name||'—'}\nDepartment: ${u.department||'—'}\nEmployee ID: ${u.employeeId||'—'}\n` +
+    `Period   : ${monthLabel}\nTotal    : ${formatCurrency(total, s.currency)}\n` +
+    `Receipts : ${receipts.length} (${imgCount} with images attached)\n\n` +
+    `Best regards,\n${u.name||'Employee'}`;
+
+  const name  = (u.name||'report').replace(/\s+/g,'_');
+  const fname = `ExpenseReport_${year}_${String(month+1).padStart(2,'0')}_${name}.pdf`;
+
+  showToast('Building PDF with images…', 'info');
+  let blob;
+  try {
+    blob = await generatePDF(receipts, null, true);
+  } catch {
+    showToast('Could not generate PDF', 'error'); return;
+  }
+  if (!blob) return;
+
+  const file = new File([blob], fname, { type: 'application/pdf' });
+
+  /* ── Web Share API (mobile / modern desktop) ── */
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ title: subject, text: bodyText, files: [file] });
+      showToast('Report shared!', 'success');
+      return;
+    } catch (err) {
+      if (err.name === 'AbortError') return; /* user cancelled */
+    }
+  }
+
+  /* ── Fallback: download PDF then open mailto ── */
+  const url = URL.createObjectURL(blob);
+  const a   = document.createElement('a');
+  a.href = url; a.download = fname; a.click();
+  URL.revokeObjectURL(url);
+
+  setTimeout(() => {
+    const mailBody    = encodeURIComponent(bodyText + '\n\n[Attach the downloaded PDF]');
+    const mailSubject = encodeURIComponent(subject);
+    window.location.href = `mailto:${s.managerEmail}?subject=${mailSubject}&body=${mailBody}`;
+  }, 600);
+
+  showToast('PDF saved — attach it to the email', 'info');
 }
 
 /* ════════════════════════════════
