@@ -1135,6 +1135,9 @@ function setupEventListeners() {
     tag.textContent = val.length >= 2 ? val : '';
   });
 
+  /* Receipt form — clone first so categoryGrid listener attaches to the live element */
+  clone('receiptForm').addEventListener('submit', saveReceipt);
+
   /* Category chips */
   document.getElementById('categoryGrid').addEventListener('click', e => {
     const chip = e.target.closest('.cat-chip');
@@ -1143,9 +1146,6 @@ function setupEventListeners() {
     chip.classList.add('selected');
     document.getElementById('fCategory').value = chip.dataset.cat;
   });
-
-  /* Receipt form */
-  clone('receiptForm').addEventListener('submit', saveReceipt);
 
   /* Search & filter */
   document.getElementById('searchInput').addEventListener('input', () => renderReceiptsList());
