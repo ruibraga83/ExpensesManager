@@ -226,6 +226,9 @@ async function loginWithSession(session) {
       State.currentUser = profile;
     }
 
+    /* Attach auth email (stored in auth.users, not profiles table) */
+    if (session.user.email) State.currentUser.email = session.user.email;
+
     /* Sync settings from profile */
     const u = State.currentUser;
     Object.assign(State.settings, {
