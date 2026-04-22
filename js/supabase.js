@@ -48,21 +48,40 @@
      updated_at  timestamptz default now()
    );
 
-   -- 2. Helper function (profiles table must exist first)
+   -- 2. Helper function — reads caller's role bypassing RLS (tables must exist first)
    create or replace function get_my_role()
    returns text language sql security definer
    set search_path = public as $$
      select role from profiles where id = auth.uid()
    $$;
 
-   -- 3. Enable RLS
+   -- 3. Auto-create profile on sign-up (runs server-side, bypasses RLS)
+   create or replace function handle_new_user()
+   returns trigger language plpgsql security definer
+   set search_path = public as $$
+   begin
+     insert into public.profiles (id, name)
+     values (
+       new.id,
+       coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1))
+     )
+     on conflict (id) do nothing;
+     return new;
+   end;
+   $$;
+
+   drop trigger if exists on_auth_user_created on auth.users;
+   create trigger on_auth_user_created
+     after insert on auth.users
+     for each row execute procedure handle_new_user();
+
+   -- 4. Enable RLS
    alter table profiles enable row level security;
    alter table receipts  enable row level security;
 
-   -- 4. Policies
-   -- Profiles: anyone authenticated can read all (work app, colleagues know each other)
+   -- 5. Policies
+   -- Profiles: anyone authenticated can read all; own insert handled by trigger
    create policy "auth_read_profiles"   on profiles for select to authenticated using (true);
-   create policy "own_insert_profile"   on profiles for insert to authenticated with check (id = auth.uid());
    create policy "own_update_profile"   on profiles for update to authenticated using (id = auth.uid());
    create policy "admin_update_profile" on profiles for update to authenticated using (get_my_role() = 'admin');
    create policy "admin_delete_profile" on profiles for delete to authenticated using (get_my_role() = 'admin');
@@ -131,14 +150,13 @@ const SB = (() => {
   }
 
   async function signUp(email, password, name) {
-    const { data, error } = await auth.signUp({ email, password });
+    /* Pass name in user_metadata — the handle_new_user trigger reads it
+       and inserts the profile server-side (bypasses RLS). */
+    const { data, error } = await auth.signUp({
+      email, password,
+      options: { data: { name: name || email.split('@')[0] } }
+    });
     if (error) _err(error);
-    if (data.user) {
-      const { error: pErr } = await _sb.from('profiles').insert({
-        id: data.user.id, name: name || email.split('@')[0], role: 'user'
-      });
-      if (pErr) console.warn('[SB] profile insert:', pErr.message);
-    }
     return data.session;
   }
 
